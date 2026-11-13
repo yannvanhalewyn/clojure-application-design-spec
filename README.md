@@ -7,25 +7,28 @@ agents as binding instructions and read by humans as design rationale.
 Core priority: **navigability first**. Plain data and functions, explicit
 composition roots, and keys you can grep from config to code.
 
+**Interactive guide:** <https://yannvanhalewyn.github.io/clojure-application-design-spec/>
+
 ## Contents
 
 | Path                         | What                                                                 |
 |------------------------------|----------------------------------------------------------------------|
 | [`SPEC.md`](SPEC.md)         | The specification (RFC 2119 MUST/SHOULD/MAY), sections §0–§12        |
-| [`index.html`](index.html)   | Interactive guide: decision helpers, namespace and route-data explorers, scaffolding checklist |
+| [`index.html`](index.html)   | Interactive guide ([live](https://yannvanhalewyn.github.io/clojure-application-design-spec/)): decision helpers, namespace and route-data explorers, scaffolding checklist |
 | [`artifacts/`](artifacts/)   | Starter files to copy into a new project                             |
 
 Topics: monorepo layout (and when to consider Polylith), namespace structure,
 namespaced keywords, Malli domain models, Aero + Integrant without derived
 keys, Reitit route tables with route-data middleware, hypermedia-first UI
 (HTMX), functions and data over multimethods, `tools.*` instead of `utils`,
-cljfmt in Tonsky style, REPL workflow with Portal.
+cljfmt in [Tonsky style](https://tonsky.me/blog/clojurefmt/), REPL workflow with
+[Portal](https://github.com/djblue/portal).
 
 ## Artifacts
 
 | File                          | Purpose                                                        |
 |-------------------------------|----------------------------------------------------------------|
-| `cljfmt.edn`                  | Formatting: 2-space lists, aligned collections (Tonsky style)  |
+| `cljfmt.edn`                  | Formatting: 2-space lists, aligned collections ([Tonsky style](https://tonsky.me/blog/clojurefmt/)) |
 | `.gitignore`                  | Build output, tooling caches, REPL state, local secrets        |
 | `.editorconfig`               | 2 spaces, LF, final newline                                    |
 | `.clj-kondo/config.edn`       | Consistent aliases, sorted requires, `:lint-as`                |
@@ -45,9 +48,11 @@ Point the agent at `SPEC.md` and the `artifacts/` directory, for example:
 
 ## Viewing the guide
 
-Open `index.html` in a browser. It is a single self-contained file with no
-external dependencies.
+The guide is published on GitHub Pages at
+<https://yannvanhalewyn.github.io/clojure-application-design-spec/>.
 
-To publish it on GitHub Pages: Settings → Pages → Deploy from a branch →
-`main`, folder `/ (root)`. The empty `.nojekyll` file makes Pages serve the
-files as-is instead of running them through Jekyll.
+Locally, open `index.html` in a browser. It is a single self-contained file with
+no external dependencies.
+
+Pages deploys from `main`, folder `/ (root)`. The empty `.nojekyll` file makes
+Pages serve the files as-is instead of running them through Jekyll.
