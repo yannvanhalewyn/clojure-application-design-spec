@@ -1,0 +1,59 @@
+# --- Clojure / JVM build output
+/target
+/classes
+/checkouts
+*.jar
+*.class
+.cpcache/
+.lein-*
+.eastwood
+
+# --- Tooling caches
+.cache/
+.clj-kondo/.cache/
+# Configs imported by clj-kondo from dependencies; keep config.edn and hooks/
+.clj-kondo/*/
+!.clj-kondo/hooks/
+.lsp/.cache/
+.lsp/sqlite*.db
+.shadow-cljs/
+.portal/
+.calva/output-window/
+.calva/repl.calva-repl
+
+# --- REPL state
+.nrepl-port
+.nrepl-history
+.socket-repl-port
+.rebel_readline_history
+
+# --- Frontend build output
+node_modules/
+/public/js/
+/public/css/
+package-lock.json
+
+# --- Local configuration and secrets (.env is committed, .env.local never)
+.env.local
+.env.*.local
+*.private.env.json
+dev/dev_opts.edn
+dev/user_local.clj
+
+# --- Local data for docker-compose services
+/db/
+/.data/
+/logs/
+
+# --- Editors and OS
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+*.swp
+*.sw?
+*~
+.DS_Store

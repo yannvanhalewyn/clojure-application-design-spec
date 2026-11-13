@@ -1,0 +1,4 @@
+{:source-aliases #{:dev :test :build}
+ :cljfmt-config-path "cljfmt.edn"
+ :clean {:ns-inner-blocks-indentation :next-line
+         :sort {:ns true :require true :import true}}}

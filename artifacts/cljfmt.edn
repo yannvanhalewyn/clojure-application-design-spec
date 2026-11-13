@@ -1,0 +1,31 @@
+;; Formatting in the style of https://tonsky.me/blog/clojurefmt/
+;;
+;; 1. Multi-line lists starting with a symbol are always indented 2 spaces.
+;; 2. Other multi-line collections align with their first element.
+;; 3. Logical/arithmetic forms align their arguments when the first argument is
+;;    on the same line: (or a
+;;                          b)
+{:paths ["src" "test" "dev" "build" "resources" "deps.edn" "bb.edn" "cljfmt.edn"]
+ :file-pattern #re "\\.clj[csx]?$|\\.edn$"
+
+ :indents {#re ".*" [[:inner 0]]}
+ :extra-indents {or      [[:block 0]]
+                 and     [[:block 0]]
+                 =       [[:block 0]]
+                 not=    [[:block 0]]
+                 str     [[:block 0]]
+                 +       [[:block 0]]
+                 -       [[:block 0]]
+                 *       [[:block 0]]
+                 comp    [[:block 0]]
+                 juxt    [[:block 0]]
+                 some-fn [[:block 0]]
+                 every-pred [[:block 0]]}
+
+ :function-arguments-indentation  :cursive
+ :indent-line-comments?           true
+ :remove-surrounding-whitespace?  false
+ :remove-trailing-whitespace?     true
+ :remove-consecutive-blank-lines? true
+ :insert-missing-whitespace?      true
+ :sort-ns-references?             true}

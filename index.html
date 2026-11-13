@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clojure Application Design — Interactive Guide</title>
+<style>
+  :root { color-scheme: light dark; }
+  :root {
+    --bg: #fbfbfa; --surface: #ffffff; --surface-2: #f3f4f3; --fg: #263330; --muted: #67706e;
+    --border: #e7e7e8; --accent: #2f6fde; --accent-soft: #e8f0fd; --ok: #1f8a4c; --ok-soft: #e5f5ec;
+    --warn: #b26b00; --warn-soft: #fdf2e0; --err: #c23b3b; --err-soft: #fbe9e9;
+    --code-bg: #f6f7f6; --kw: #8a3ffc; --str: #1f7a4d; --cmt: #8b9491; --sym: #2f6fde;
+    --radius: 10px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141817; --surface: #1b201f; --surface-2: #232928; --fg: #e5e9e8; --muted: #9aa3a1;
+      --border: #2f3634; --accent: #6ea2ff; --accent-soft: #1f2b40; --ok: #4cc283; --ok-soft: #173126;
+      --warn: #f0b04f; --warn-soft: #3a2c14; --err: #f07272; --err-soft: #3d1c1c;
+      --code-bg: #161a19; --kw: #c3a1ff; --str: #7fd6a4; --cmt: #6f7876; --sym: #8db7ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+  pre { margin: 12px 0; padding: 14px 16px; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; font: 13px/1.55 var(--mono); }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  /* Color only: bold/italic glyphs can be wider in some monospace fonts and break alignment. */
+  .t-kw { color: var(--kw); } .t-str { color: var(--str); } .t-cmt { color: var(--cmt); } .t-def { color: var(--sym); }
+
+  .layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); min-height: 100vh; }
+  nav.side { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 22px 16px; border-right: 1px solid var(--border); background: var(--surface); }
+  nav.side h1 { font-size: 16px; margin: 0 0 4px; line-height: 1.3; }
+  nav.side p.sub { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  nav.side input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; }
+  nav.side ol { list-style: none; padding: 0; margin: 14px 0 0; }
+  nav.side li a { display: block; padding: 5px 10px; border-radius: 7px; color: var(--fg); text-decoration: none; font-size: 14px; }
+  nav.side li a:hover { background: var(--surface-2); }
+  nav.side li a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  nav.side li.hidden { display: none; }
+  nav.side .num { display: inline-block; width: 22px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  main { padding: 34px 48px 120px; max-width: 1080px; }
+  section { padding: 10px 0 34px; border-bottom: 1px solid var(--border); }
+  section.hidden { display: none; }
+  section h2 { font-size: 24px; margin: 18px 0 6px; letter-spacing: -0.01em; }
+  section h3 { font-size: 16px; margin: 22px 0 8px; }
+  .lead { color: var(--muted); margin: 0 0 14px; }
+  .specref { font-size: 12px; color: var(--muted); margin-left: 8px; font-weight: 400; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav.side { position: static; height: auto; } main { padding: 20px; } .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+  .rule { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; }
+  .badge { flex: none; font: 600 11px/1 var(--mono); padding: 4px 6px; border-radius: 5px; letter-spacing: 0.02em; }
+  .b-must { background: var(--err-soft); color: var(--err); }
+  .b-should { background: var(--warn-soft); color: var(--warn); }
+  .b-may { background: var(--ok-soft); color: var(--ok); }
+
+  .priority { counter-reset: p; display: grid; gap: 10px; }
+  .priority .card { display: flex; gap: 14px; align-items: center; }
+  .priority .n { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 10px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+
+  button, .btn { font: inherit; font-size: 14px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.sel { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  label.check { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; cursor: pointer; }
+  label.check input { margin-top: 4px; }
+
+  .result { margin-top: 14px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-2); }
+  .result.ok { background: var(--ok-soft); border-color: transparent; }
+  .result.warn { background: var(--warn-soft); border-color: transparent; }
+  .result.err { background: var(--err-soft); border-color: transparent; }
+  .result h4 { margin: 0 0 6px; font-size: 15px; }
+
+  /* Namespace explorer */
+  .tree { font: 13px/1.5 var(--mono); }
+  .tree div { padding: 2px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tree div:hover { background: var(--surface-2); }
+  .tree div.sel { background: var(--accent-soft); color: var(--accent); }
+  .tree .grp { color: var(--muted); cursor: default; margin-top: 8px; font-family: system-ui, sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .tree .grp:hover { background: none; }
+  .pill { display: inline-block; font: 600 11px/1 system-ui, sans-serif; padding: 4px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); margin: 2px 4px 2px 0; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+  .pill.err { background: var(--err-soft); color: var(--err); border-color: transparent; }
+
+  /* Route explorer */
+  .routes button { width: 100%; text-align: left; font-family: var(--mono); font-size: 13px; margin-bottom: 6px; display: flex; gap: 10px; }
+  .method { font-weight: 700; width: 52px; flex: none; }
+  .m-GET { color: var(--ok); } .m-POST { color: var(--accent); } .m-PATCH { color: var(--warn); } .m-DELETE { color: var(--err); }
+  .stack { list-style: none; padding: 0; margin: 0; }
+  .stack li { display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-left: 3px solid var(--border); margin-bottom: 4px; font-size: 13px; }
+  .stack li code { background: none; padding: 0; }
+  .stack li.on { border-left-color: var(--ok); }
+  .stack li.off { opacity: 0.45; }
+  .stack li.stop { border-left-color: var(--err); background: var(--err-soft); opacity: 1; }
+  .stack li .why { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .trace { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
+
+  /* Config composer */
+  .cfg-col { font: 13px/1.6 var(--mono); }
+  .cfg-col .shared { color: var(--accent); }
+
+  /* Linter */
+  .lint-input { width: 100%; font: 14px var(--mono); padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); }
+  .issues { list-style: none; padding: 0; margin: 10px 0 0; }
+  .issues li { padding: 6px 0; }
+
+  /* Before / after */
+  .ba-toggle { margin-bottom: 6px; }
+  .progress { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 8px 0 12px; }
+  .progress > div { height: 100%; background: var(--ok); width: 0; transition: width .2s; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="side">
+    <h1>Clojure Application Design</h1>
+    <p class="sub">Interactive guide to <a href="SPEC.md">SPEC.md</a></p>
+    <input id="search" type="search" placeholder="Filter sections…" autocomplete="off">
+    <ol id="toc"></ol>
+  </nav>
+
+  <main>
+    <!-- 0 -->
+    <section id="principles" data-title="Navigability first" data-num="0">
+      <h2>Navigability first <span class="specref">SPEC §0</span></h2>
+      <p class="lead">Every rule derives from one priority order. When two rules conflict, the higher one wins.</p>
+      <div class="priority">
+        <div class="card"><div class="n">1</div><div><strong>Navigability &amp; traceability.</strong> From any call site, go-to-definition or one grep reaches the implementation. Direct var references over keyword dispatch; explicit lists over load-order side effects.</div></div>
+        <div class="card"><div class="n">2</div><div><strong>Plain data and functions.</strong> Maps and vectors are inspectable at the REPL, printable, diffable, composable.</div></div>
+        <div class="card"><div class="n">3</div><div><strong>Boring, explicit composition.</strong> Few composition roots — system config, router, layout — each listing its parts.</div></div>
+        <div class="card"><div class="n">4</div><div><strong>Abstraction only for real repetition</strong>, and it must expand to data you could have written by hand.</div></div>
+      </div>
+    </section>
+
+    <!-- 1 -->
+    <section id="monorepo" data-title="Monorepo & Polylith" data-num="1">
+      <h2>Monorepo with services <span class="specref">SPEC §1</span></h2>
+      <p class="lead">One repository, one <code>deps.edn</code>, many services. Services are namespaces (<code>com.company.service-NN-name.*</code>), not separate projects.</p>
+      <div class="grid2">
+        <div class="card">
+          <h3 style="margin-top:0">Every service has</h3>
+          <div class="rule"><span class="badge b-must">MUST</span><div><code>main.clj</code> — <code>-main</code> calls <code>run-system!</code> with the service root key. Nothing else.</div></div>
+          <div class="rule"><span class="badge b-must">MUST</span><div><code>system.clj</code> — one <code>defmethod</code> per service key (no <code>derive</code>), requires of every ns with needed <code>defmethod</code>s.</div></div>
+          <div class="rule"><span class="badge b-must">MUST</span><div><code>server.clj</code> — router from feature route tables + the one explicit middleware vector.</div></div>
+          <div class="rule"><span class="badge b-must">MUST</span><div><code>resources/system/services/&lt;name&gt;.edn</code></div></div>
+          <div class="rule"><span class="badge b-must">MUST NOT</span><div>require another service's namespaces. Shared code moves to <code>com.company.&lt;concern&gt;</code>.</div></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Should we use Polylith? Check what applies</h3>
+          <div id="poly"></div>
+          <div id="poly-result" class="result"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section id="namespaces" data-title="Namespace structure" data-num="2">
+      <h2>Namespace structure <span class="specref">SPEC §2</span></h2>
+      <p class="lead"><code>com.company.&lt;app-or-service&gt;.&lt;feature|concern|component|entity&gt;.&lt;layer&gt;.*</code> — click a namespace.</p>
+      <div class="grid2">
+        <div class="card tree" id="ns-tree"></div>
+        <div class="card" id="ns-detail"></div>
+      </div>
+      <h3>Dependency direction</h3>
+      <pre><code class="plain">routes ──▶ db ──▶ model (cljc) ──▶ tools.*
+   └─────▶ views ──▶ model
+model  ✗ db / routes / views        views ✗ routes / db        tools.* ✗ anything domain</code></pre>
+    </section>
+
+    <!-- 3 -->
+    <section id="keywords" data-title="Namespaced keywords" data-num="3">
+      <h2>Namespaced keywords <span class="specref">SPEC §3</span></h2>
+      <p class="lead">Pick the kind of key before naming it. Answer the questions.</p>
+      <div class="card">
+        <div id="kw-wizard"></div>
+        <div id="kw-result"></div>
+      </div>
+      <h3>Examples</h3>
+      <table>
+        <thead><tr><th>Kind</th><th>Key</th><th>Owner / why</th></tr></thead>
+        <tbody>
+          <tr><td>Domain</td><td><code>:user/first-name</code></td><td>Persisted, in forms, on the wire</td></tr>
+          <tr><td>Domain enum</td><td><code>:product.audience-type/internal</code></td><td><code>&lt;entity&gt;.&lt;attr&gt;/&lt;value&gt;</code></td></tr>
+          <tr><td>Domain vocabulary</td><td><code>:permission/manage-products</code>, <code>:role/admin</code>, <code>:feature/new-onboarding</code></td><td>Cross-cutting domain terms</td></tr>
+          <tr><td>Mechanical</td><td><code>::modal/is-open</code></td><td>UI state owned by the modal view ns</td></tr>
+          <tr><td>Mechanical</td><td><code>::kafka/bucket</code></td><td>Component config owned by <code>com.company.kafka</code></td></tr>
+          <tr><td>Mechanical (route data)</td><td><code>::auth/permissions</code>, <code>::layout/page</code></td><td>Understood by one compiled middleware</td></tr>
+          <tr><td>Mechanical (request)</td><td><code>::static-assets/files</code>, <code>::feature-flags/enabled-features</code></td><td>Put on the request by the system, read by the owner ns</td></tr>
+          <tr><td>Vocabulary (DSL)</td><td><code>:res/hiccup</code>, <code>:htmx/trigger</code></td><td>Short ns, documented once in the owner</td></tr>
+          <tr><td>Integrant component</td><td><code>:com.company.kafka/producer</code></td><td>Qualified to the ns with the <code>defmethod</code>s</td></tr>
+          <tr><td>Integrant service instance</td><td><code>:service/portal</code>, <code>:service.portal/http-server</code></td><td>Own one-line <code>defmethod</code> in the service's <code>system.clj</code>; never <code>derive</code>d</td></tr>
+          <tr><td>Route name</td><td><code>::product.routes/show</code></td><td>Owned by the routes ns; <code>:as-alias</code> elsewhere</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 4 -->
+    <section id="schemas" data-title="Domain models & schemas" data-num="4">
+      <h2>Domain models &amp; schemas <span class="specref">SPEC §4</span></h2>
+      <p class="lead">The entity namespace (<code>product.cljc</code>) is the model: schemas first, then <code>make</code>, predicates, pure transforms. <code>product.db</code>, <code>product.views</code>, <code>product.routes</code> build on it.</p>
+      <div class="grid2">
+        <div>
+          <pre><code class="clj">(def Id
+  "(schema) Identifier of a product."
+  (m/schema :uuid))
+
+(def Product
+  "(schema) A product as read from the database."
+  (m/schema
+    [:map
+     [:product/id Id]
+     [:product/name [:string {:min 1}]]
+     [:product/audience-type AudienceType]
+     ;; Optionally enriched for the UI
+     [:product/stream-ids {:optional true} [:set :uuid]]]))
+
+(def UpdateParams
+  "(schema) Form params accepted when updating a product."
+  (mu/optional-keys
+    (mu/select-keys Product [:product/name])))
+
+(defn make [attrs]
+  (assoc (select-keys attrs [:product/name])
+    :product/id (random-uuid)
+    :product/audience-type :product.audience-type/internal))
+
+(defn internal? [product]
+  (= :product.audience-type/internal (:product/audience-type product)))</code></pre>
+        </div>
+        <div>
+          <div class="rule"><span class="badge b-must">MUST</span><div>Schema for every domain map: <code>Id</code>, <code>&lt;Entity&gt;</code>, enums, <code>CreateParams</code>/<code>UpdateParams</code>.</div></div>
+          <div class="rule"><span class="badge b-must">MUST</span><div>Derive param schemas with <code>malli.util</code>; never re-type keys.</div></div>
+          <div class="rule"><span class="badge b-should">SHOULD</span><div>Reference schemas by var (<code>product/Product</code>), not registry keyword. Registry only for primitive types (<code>:base-url</code>, <code>:secret</code>).</div></div>
+          <div class="rule"><span class="badge b-must">MUST</span><div>Model fns are pure: no db, request, or clock.</div></div>
+          <table>
+            <thead><tr><th>Boundary</th><th>Enforced by</th></tr></thead>
+            <tbody>
+              <tr><td>HTTP params</td><td>reitit <code>:parameters</code> + malli coercion</td></tr>
+              <tr><td>System config</td><td><code>ig/assert-key</code> + throwing coercer</td></tr>
+              <tr><td>External payloads</td><td><code>m/coerce</code> at client edge</td></tr>
+              <tr><td>Internal fn args</td><td>documentation only</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section id="system" data-title="Aero + Integrant" data-num="5">
+      <h2>System: Aero + Integrant <span class="specref">SPEC §5</span></h2>
+      <p class="lead"><code>resources/system/system.edn</code> is the composition root. <code>#service</code> merges a block only for the services being started. Pick services to start:</p>
+      <div class="card">
+        <div class="row" id="svc-picker"></div>
+        <div class="grid2" style="margin-top:14px">
+          <div><div class="muted small">Included config files</div><div class="cfg-col" id="cfg-files"></div></div>
+          <div><div class="muted small">Resulting Integrant keys (blue = shared component)</div><div class="cfg-col" id="cfg-keys"></div></div>
+        </div>
+      </div>
+      <h3>Rules</h3>
+      <div class="rule"><span class="badge b-must">MUST</span><div><code>ig/init-key</code> bodies are one line delegating to a plain fn (<code>start-producer</code>) callable from REPL/tests.</div></div>
+      <div class="rule"><span class="badge b-must">MUST</span><div>Validate component config with <code>ig/assert-key</code> + Malli.</div></div>
+      <div class="rule"><span class="badge b-must">MUST</span><div>Secrets via <code>#secret</code> (prints <code>***</code>) and <code>#env/local</code> (throws if defined in committed <code>.env</code>).</div></div>
+      <div class="rule"><span class="badge b-should">SHOULD</span><div>Handler config is merged onto the request; handlers read it through accessors in <code>com.company.request</code> (<code>req/db</code>, <code>req/route-url</code>).</div></div>
+    </section>
+
+    <!-- 6 -->
+    <section id="routing" data-title="Reitit route data" data-num="6">
+      <h2>Route tables, route data, compiled middleware <span class="specref">SPEC §6</span></h2>
+      <p class="lead">Routes are data. Cross-cutting behavior is a route-data key understood by exactly one <code>:compile</code> middleware, listed once in <code>server.clj</code>. Pick a route and a request to see what mounts and what happens.</p>
+      <div class="grid2">
+        <div>
+          <div class="routes" id="route-list"></div>
+          <div class="card small" style="margin-top:10px">
+            <label class="check"><input type="checkbox" id="opt-hx"> Request sent by htmx (<code>HX-Request: true</code>)</label>
+            <label class="check"><input type="checkbox" id="opt-perm" checked> Current user has <code>:permission/manage-products</code></label>
+            <label class="check"><input type="checkbox" id="opt-valid" checked> Params are valid</label>
+            <label class="check"><input type="checkbox" id="opt-found" checked> Product exists</label>
+          </div>
+        </div>
+        <div>
+          <pre><code class="clj" id="route-data"></code></pre>
+          <div class="muted small">Middleware vector (outermost first)</div>
+          <ul class="stack" id="route-stack"></ul>
+          <div class="result" id="route-trace"></div>
+        </div>
+      </div>
+      <h3>Response intents</h3>
+      <p class="muted small">Handlers return a Ring response or an intent map; <code>response/middleware</code> renders it.</p>
+      <table>
+        <thead><tr><th>Key</th><th>Produces</th></tr></thead>
+        <tbody>
+          <tr><td><code>:res/hiccup</code></td><td><code>text/html</code> from hiccup</td></tr>
+          <tr><td><code>:res/json</code></td><td><code>application/json</code></td></tr>
+          <tr><td><code>:res/redirect</code></td><td>303 to URL</td></tr>
+          <tr><td><code>:res/no-content</code></td><td>204</td></tr>
+          <tr><td><code>:htmx/trigger</code>, <code>:htmx/push-url</code>, <code>:htmx/redirect</code>, <code>:htmx/refresh</code></td><td><code>HX-*</code> response headers</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 7 -->
+    <section id="frontend" data-title="Hypermedia first" data-num="7">
+      <h2>Web UI: hypermedia first <span class="specref">SPEC §7</span></h2>
+      <p class="lead">HTMX for ~90% of apps. Check what your app genuinely needs:</p>
+      <div class="card">
+        <div id="fe-questions"></div>
+        <div id="fe-result" class="result"></div>
+      </div>
+      <h3>Hypermedia rules</h3>
+      <div class="rule"><span class="badge b-must">MUST</span><div>The server decides which actions exist: handlers pass action URLs to views; a view renders an action iff its URL is non-nil.</div></div>
+      <div class="rule"><span class="badge b-must">MUST</span><div>One URL serves full page and fragment; <code>::layout/page</code> middleware wraps when <code>HX-Request</code> is absent.</div></div>
+      <div class="rule"><span class="badge b-must">MUST NOT</span><div>pass the request, router, or db into leaf view components.</div></div>
+      <div class="rule"><span class="badge b-should">SHOULD</span><div>Shared DOM ids and event names are constants in the owning view ns: <code>layout/PAGE_CONTAINER_ID</code>, <code>modal/CLOSE_EVENT</code>.</div></div>
+      <div class="rule"><span class="badge b-should">SHOULD</span><div>Cross-component updates via <code>HX-Trigger</code> events.</div></div>
+    </section>
+
+    <!-- 8 -->
+    <section id="multimethods" data-title="Functions & data over multimethods" data-num="8">
+      <h2>Functions and data over multimethods <span class="specref">SPEC §8</span></h2>
+      <p class="lead">When we control every case, dispatch is data: a map, a vector, <code>case</code>, <code>cond</code>. Multimethods only at extension points owned by a library (Integrant, Aero, <code>print-method</code>) or true plugin systems.</p>
+      <div class="row ba-toggle" id="mm-picker"></div>
+      <div class="grid2">
+        <div><div class="muted small">Avoid</div><pre><code class="clj" id="mm-avoid"></code></pre></div>
+        <div><div class="muted small">Prefer</div><pre><code class="clj" id="mm-prefer"></code></pre></div>
+      </div>
+      <div class="result" id="mm-why"></div>
+    </section>
+
+    <!-- 9 -->
+    <section id="tools" data-title="Tools, not utils" data-num="9">
+      <h2>Tools, not utils <span class="specref">SPEC §9</span></h2>
+      <p class="lead">No <code>utils</code>/<code>helpers</code>/<code>common</code>/<code>misc</code>. The namespace states the concern so the function name doesn't have to. Try a name:</p>
+      <div class="card">
+        <input class="lint-input" id="lint" value="server-utils/is-htmx-request?" spellcheck="false">
+        <div class="row" style="margin-top:8px">
+          <span class="muted small">Try:</span>
+          <button data-lint="utils/format-date">utils/format-date</button>
+          <button data-lint="helpers/dom-id">helpers/dom-id</button>
+          <button data-lint="tools.htmx/htmx-request?">tools.htmx/htmx-request?</button>
+          <button data-lint="tools.htmx/client-request?">tools.htmx/client-request?</button>
+        </div>
+        <ul class="issues" id="lint-out"></ul>
+      </div>
+      <h3>Typical <code>tools.*</code></h3>
+      <table>
+        <thead><tr><th>Namespace</th><th>Concern</th></tr></thead>
+        <tbody>
+          <tr><td><code>tools.htmx</code></td><td><code>client-request?</code>, <code>target</code>, <code>boosted?</code>, header encoding</td></tr>
+          <tr><td><code>tools.hyperscript</code></td><td><code>on</code>, <code>join</code>, <code>keydown</code>, <code>nav-to</code></td></tr>
+          <tr><td><code>tools.dom</code></td><td><code>id</code> → <code>"#id"</code></td></tr>
+          <tr><td><code>tools.response</code></td><td>response intents, <code>not-found!</code>, streaming</td></tr>
+          <tr><td><code>tools.malli</code></td><td>registry, custom types, transformers, <code>throwing-coercer</code></td></tr>
+          <tr><td><code>tools.integrant</code></td><td><code>init-system!</code> with partial halt</td></tr>
+          <tr><td><code>tools.date</code>, <code>tools.base64</code>, <code>tools.jwt</code>, <code>tools.jetty</code>, <code>tools.&lt;java-lib&gt;</code></td><td>as named</td></tr>
+        </tbody>
+      </table>
+      <div class="rule"><span class="badge b-must">MUST NOT</span><div><code>tools.*</code> requires any domain or service namespace. It could be extracted into a library unchanged.</div></div>
+    </section>
+
+    <!-- 10 -->
+    <section id="style" data-title="Code style" data-num="10">
+      <h2>Code style: cljfmt, Tonsky style <span class="specref">SPEC §10</span></h2>
+      <p class="lead">Based on <a href="https://tonsky.me/blog/clojurefmt/">tonsky.me/blog/clojurefmt</a>, enforced by <code>artifacts/cljfmt.edn</code>. Toggle to see what <code>cljfmt fix</code> does.</p>
+      <div class="row ba-toggle"><button id="style-before">Before</button><button id="style-after" class="sel">After cljfmt fix</button></div>
+      <pre><code class="clj" id="style-code"></code></pre>
+      <div class="grid3">
+        <div class="card small"><strong>Lists starting with a symbol</strong><br>always 2 spaces. No per-macro rules.</div>
+        <div class="card small"><strong>Vectors, maps, sets</strong><br>align with the first element.</div>
+        <div class="card small"><strong><code>or and = str + comp juxt</code></strong><br>align arguments when the first is on the opening line.</div>
+      </div>
+      <h3>Naming</h3>
+      <table>
+        <tbody>
+          <tr><td>Side effect</td><td><code>create!</code>, <code>send!</code></td><td>Predicate</td><td><code>internal?</code> (no <code>is-</code>)</td></tr>
+          <tr><td>Conversion</td><td><code>-&gt;ring</code></td><td>Constructor</td><td><code>make</code>, <code>make-client</code></td></tr>
+          <tr><td>Schema</td><td><code>Product</code>, <code>UpdateParams</code></td><td>Constant</td><td><code>CLOSE_EVENT</code></td></tr>
+          <tr><td>Lifecycle</td><td><code>start-x</code> / <code>stop-x</code></td><td>Unused on purpose</td><td><code>^:lsp/allow-unused</code></td></tr>
+        </tbody>
+      </table>
+      <h3>Artifacts</h3>
+      <table>
+        <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>artifacts/cljfmt.edn</code></td><td>Formatting rules above</td></tr>
+          <tr><td><code>artifacts/.gitignore</code></td><td>Build output, <code>.cpcache</code>, <code>.cache</code>, kondo/lsp caches, REPL state, secrets</td></tr>
+          <tr><td><code>artifacts/.editorconfig</code></td><td>2 spaces, LF, final newline</td></tr>
+          <tr><td><code>artifacts/.clj-kondo/config.edn</code></td><td>Consistent aliases, sorted requires, <code>:lint-as</code></td></tr>
+          <tr><td><code>artifacts/.lsp/config.edn</code></td><td>clojure-lsp uses the same cljfmt config</td></tr>
+          <tr><td><code>artifacts/deps.edn</code>, <code>bb.edn</code>, <code>build/build.clj</code></td><td>Starter deps, tasks, per-service uberjars</td></tr>
+          <tr><td><code>artifacts/env.example</code></td><td>Copy to <code>.env</code>: committed non-secret defaults</td></tr>
+          <tr><td><code>artifacts/dev/user.clj</code></td><td>REPL entry point: <code>go</code>/<code>reset</code>/<code>halt</code> + Portal helpers</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 11 -->
+    <section id="portal" data-title="REPL & Portal" data-num="11">
+      <h2>Inspecting data with Portal <span class="specref">SPEC §11.1</span></h2>
+      <p class="lead"><a href="https://github.com/djblue/portal">DJBlue Portal</a> lives in <code>dev/user.clj</code> only. It runs on a fixed port, never opens a window, and prints the URL to visit.</p>
+      <div class="grid2">
+        <div>
+          <pre><code class="clj">;; 1. Start the server + tap target (no browser)
+(portal-start!)
+;; Portal running at http://localhost:53755 (port 53755)
+
+;; 2. Open http://localhost:53755 yourself; keep the tab.
+
+;; 3. Send values
+(tap> (read-config))        ; secrets print masked
+(tap> (current-system))
+(tap> (product.db/all (db)))
+
+;; 4. Clean up
+(portal-clear!)
+(portal-stop!)              ; frees the port</code></pre>
+        </div>
+        <div>
+          <div class="rule"><span class="badge b-must">MUST</span><div>Start with <code>portal.api/start {:port 53755}</code>, not <code>open</code>: <code>open</code> launches a window.</div></div>
+          <div class="rule"><span class="badge b-must">MUST</span><div>Print the URL and port; the developer visits it. The URL never changes, so reload the open tab after a REPL restart.</div></div>
+          <div class="rule"><span class="badge b-must">MUST NOT</span><div>require Portal from <code>src</code>. Remove <code>tap&gt;</code> calls before committing.</div></div>
+          <div class="rule"><span class="badge b-should">SHOULD</span><div>Use <code>tap&gt;</code> instead of <code>println</code>/<code>pprint</code> for config, query results, requests.</div></div>
+          <div class="result warn small"><strong>One owner per port.</strong> A second REPL calling <code>(portal-start!)</code> fails with “Address already in use”: run <code>(portal-stop!)</code> in the other REPL first.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 12 -->
+    <section id="checklist" data-title="Scaffolding checklist" data-num="12">
+      <h2>Scaffolding checklist <span class="specref">SPEC §12</span></h2>
+      <p class="lead">Progress is saved in this browser.</p>
+      <div class="progress"><div id="cl-bar"></div></div>
+      <div class="card" id="cl"></div>
+      <div class="row" style="margin-top:10px"><button id="cl-reset">Reset checklist</button></div>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "html") el.innerHTML = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid != null) el.append(kid.nodeType ? kid : document.createTextNode(kid));
+  return el;
+};
+
+/* ---------- Clojure highlighter ---------- */
+const TOKEN = /(;[^\n]*)|("(?:\\.|[^"\\])*")|(::?[\w.*+!?<>=\/-]+)|(\((?:defn-?|def|defmethod|ns|defmacro)\s+)([^\s()\[\]]+)/g;
+function highlight(code) {
+  let out = "", last = 0;
+  code.replace(TOKEN, (m, cmt, str, kw, defHead, defName, idx) => {
+    out += esc(code.slice(last, idx));
+    if (cmt) out += `<span class="t-cmt">${esc(cmt)}</span>`;
+    else if (str) out += `<span class="t-str">${esc(str)}</span>`;
+    else if (kw) out += `<span class="t-kw">${esc(kw)}</span>`;
+    else out += esc(defHead) + `<span class="t-def">${esc(defName)}</span>`;
+    last = idx + m.length;
+  });
+  return out + esc(code.slice(last));
+}
+const setCode = (el, code) => { el.innerHTML = highlight(code); };
+$$("code.clj").forEach(el => { if (el.textContent.trim()) setCode(el, el.textContent); });
+
+/* ---------- TOC + search ---------- */
+const sections = $$("main section");
+const toc = $("#toc");
+sections.forEach(s => {
+  toc.append(h("li", { "data-for": s.id },
+    h("a", { href: "#" + s.id }, h("span", { class: "num" }, s.dataset.num), s.dataset.title)));
+});
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      $$("#toc a").forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + e.target.id));
+    }
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });
+sections.forEach(s => io.observe(s));
+$("#search").addEventListener("input", e => {
+  const q = e.target.value.trim().toLowerCase();
+  sections.forEach(s => {
+    const hit = !q || s.textContent.toLowerCase().includes(q);
+    s.classList.toggle("hidden", !hit);
+    $(`#toc li[data-for="${s.id}"]`).classList.toggle("hidden", !hit);
+  });
+});
+
+/* ---------- §1 Polylith check ---------- */
+const POLY = [
+  "Services need conflicting versions of the same library",
+  "Deployables' dependency trees diverge heavily (image size, CVE surface) and per-service aliases no longer help",
+  "Several teams need enforced component boundaries",
+  "Incremental CI (test only what changed) is a real bottleneck",
+  "More than ~6 deployables",
+];
+const polyBox = $("#poly");
+POLY.forEach((t, i) => polyBox.append(h("label", { class: "check" }, h("input", { type: "checkbox", "data-i": i, onchange: renderPoly }), t)));
+function renderPoly() {
+  const n = $$("#poly input:checked").length;
+  const r = $("#poly-result");
+  r.className = "result " + (n >= 2 ? "warn" : "ok");
+  r.innerHTML = n >= 2
+    ? `<h4>Consider Polylith (${n} signals)</h4>Two or more signals the single <code>deps.edn</code> can't absorb. Budget for the cost: an extra <code>interface</code> hop on every go-to-definition, a different layout, more deps files.`
+    : n === 1
+      ? `<h4>Stay on one deps.edn (1 signal)</h4>Absorb it with <code>:service/&lt;name&gt;</code> aliases and per-service builds in <code>build.clj</code>.`
+      : `<h4>Stay on one deps.edn</h4>Services as namespaces, <code>#service</code> config blocks, per-service uberjars. Re-evaluate when signals appear.`;
+}
+renderPoly();
+
+/* ---------- §2 Namespace explorer ---------- */
+const NS = [
+  { grp: "Service: portal" },
+  { ns: "service-02-portal.main", layer: "service entry", what: "<code>-main</code> → <code>(system/run-system! [:service/portal] :production)</code>. Nothing else.", may: ["system", "service system ns"], not: ["routes", "views"] },
+  { ns: "service-02-portal.system", layer: "service system", what: "One <code>defmethod</code> per <code>:service.portal/*</code> key, each a one-line call to a shared plain fn. No <code>derive</code>. Requires every ns whose <code>defmethod</code>s are needed.", may: ["components", "server", "tools.integrant", "tools.malli"], not: ["other services"] },
+  { ns: "service-02-portal.server", layer: "composition root (HTTP)", what: "Concats feature route tables; the <strong>only</strong> place middleware is installed.", may: ["*.routes", "auth", "views.layout", "tools.response"], not: ["db directly"] },
+  { ns: "service-02-portal.views.layout", layer: "service view", what: "Page shell, sidebar, <code>PAGE_CONTAINER_ID</code>, and the <code>::layout/page</code> compiled middleware.", may: ["shared views.*", "tools.htmx", "tools.hiccup"], not: ["*.routes", "*.db"] },
+  { ns: "service-02-portal.views.modal", layer: "service view", what: "Modal component, <code>ROOT_ID</code>, <code>CLOSE_EVENT</code>, <code>::modal/is-open</code>.", may: ["tools.hyperscript", "tools.dom"], not: ["*.routes", "*.db"] },
+  { grp: "Entity: product" },
+  { ns: "service-02-portal.product", layer: "model (cljc)", what: "Schemas (<code>Id</code>, <code>Product</code>, <code>AudienceType</code>, <code>CreateParams</code>, <code>UpdateParams</code>), <code>make</code>, predicates, pure transforms.", may: ["other models", "tools.*"], not: ["product.db", "product.routes", "product.views"] },
+  { ns: "service-02-portal.product.db", layer: "db", what: "Reads take a db value; writes take a node and end in <code>!</code>. <code>…-tx-ops</code> fns return pure tx data.", may: ["product", "com.company.db"], not: ["routes", "views"] },
+  { ns: "service-02-portal.product.views", layer: "views", what: "Pure hiccup fns of a props map. Receive URLs as props; render an action iff its URL is non-nil.", may: ["product", "views.layout", "shared views.*", "tools.*"], not: ["routes", "db", "request"] },
+  { ns: "service-02-portal.product.views.edit-modal", layer: "views (part)", what: "A larger sub-view split out of <code>product.views</code>.", may: ["product", "views.modal"], not: ["routes", "db"] },
+  { ns: "service-02-portal.product.routes", layer: "routes", what: "Plain <code>defn</code> handlers returning intents + <code>(defn routes [] …)</code> table with route names <code>::index</code>, <code>::show</code>.", may: ["product", "product.db", "product.views", "request", "auth (:as-alias)"], not: ["other services"] },
+  { grp: "Feature: team (spans user + role)" },
+  { ns: "service-02-portal.team.routes", layer: "feature routes", what: "Same layers as an entity, for a feature orchestrating several models.", may: ["user", "user.db", "team.views"], not: ["other services"] },
+  { grp: "Shared" },
+  { ns: "user", layer: "shared model (cljc)", what: "Domain model used by several services.", may: ["other models", "tools.*"], not: ["service namespaces"] },
+  { ns: "request", layer: "shared concern", what: "Request accessors: <code>db</code>, <code>db-node</code>, <code>route-url</code>, <code>current-user</code>, <code>authorized?</code>.", may: ["db", "user", "reitit.core"], not: ["service namespaces"] },
+  { ns: "kafka", layer: "component", what: "<code>start-producer</code>/<code>stop-producer</code> + <code>ig/init-key ::producer</code>. Config keys <code>::kafka/bucket</code>.", may: ["tools.*"], not: ["service namespaces"] },
+  { ns: "tools.htmx", layer: "tool (cljc)", what: "<code>client-request?</code>, <code>target</code>, <code>boosted?</code>. Domain-agnostic; extractable as a library.", may: ["libraries only"], not: ["any domain or service ns"] },
+];
+const tree = $("#ns-tree");
+NS.forEach((n, i) => {
+  if (n.grp) tree.append(h("div", { class: "grp" }, n.grp));
+  else tree.append(h("div", { "data-i": i, title: "com.company." + n.ns, onclick: () => selectNs(i) }, "com.company." + n.ns));
+});
+function selectNs(i) {
+  const n = NS[i];
+  $$("#ns-tree div[data-i]").forEach(d => d.classList.toggle("sel", +d.dataset.i === i));
+  $("#ns-detail").innerHTML =
+    `<div class="muted small">${esc(n.layer)}</div>
+     <h3 style="margin:2px 0 10px;font-family:var(--mono);font-size:14px;word-break:break-all">com.company.${esc(n.ns)}</h3>
+     <p>${n.what}</p>
+     <div class="small muted">May require</div><div>${n.may.map(x => `<span class="pill ok">${esc(x)}</span>`).join("")}</div>
+     <div class="small muted" style="margin-top:8px">Must not require</div><div>${n.not.map(x => `<span class="pill err">${esc(x)}</span>`).join("")}</div>`;
+}
+selectNs(NS.findIndex(n => n.ns === "service-02-portal.product"));
+
+/* ---------- §3 Keyword wizard ---------- */
+const KW = {
+  start: { q: "Is the key part of domain data — persisted, in forms, sent over the wire?", a: [["Yes", "enum"], ["No", "dsl"]] },
+  enum: { q: "Is it an enumerated value rather than an attribute?", a: [["Attribute", "R:domain"], ["Enum value", "R:enum"]] },
+  dsl: { q: "Is it part of an in-house DSL used in hundreds of call sites (like response intents)?", a: [["Yes", "R:vocab"], ["No", "ig"]] },
+  ig: { q: "Is it an Integrant system key?", a: [["Yes", "igkind"], ["No", "R:mech"]] },
+  igkind: { q: "How often does the system have this component?", a: [["Once, implemented in one ns", "R:igcomp"], ["Per service or several times", "R:igsvc"]] },
+};
+const KW_R = {
+  domain: ["ok", "Domain key: short namespace = entity", ":user/first-name\n:product/name\n{:user/keys [first-name last-name]}", "Survives refactors; never unqualified, never <code>:user-first-name</code>."],
+  enum: ["ok", "Domain enum: <entity>.<attr>/<value>", ":product.audience-type/internal\n:order.status/paid", "Cross-cutting vocabularies get their own short ns: <code>:role/admin</code>, <code>:permission/…</code>, <code>:feature/…</code>."],
+  vocab: ["warn", "Vocabulary key: short, documented once", "{:res/hiccup [:div …]\n :htmx/trigger [modal/CLOSE_EVENT]}", "Deliberate exception. Document the full vocabulary in the owner ns docstring and validate with Malli. When unsure, use a mechanical key."],
+  mech: ["ok", "Mechanical key: fully qualified with ::", "{::modal/is-open true}\n{::kafka/bucket \"events\"}\n{::auth/permissions [:permission/manage-products]}\n(::static-assets/files req)", "Rename-safe with clojure-lsp, find-references hits every producer and consumer. Require the owner with <code>:as-alias</code> when you only need its keywords. In EDN write the full form <code>:com.company.kafka/bucket</code>."],
+  igcomp: ["ok", "Component key: qualified to the implementing ns", ":com.company.kafka/producer\n(defmethod ig/init-key ::producer [_ config]\n  (start-producer config))", "Go-to-namespace from the key lands on the defmethods."],
+  igsvc: ["ok", "Service instance: :service.<name>/<thing>", "(defmethod ig/init-key :service.portal/db [_ config]\n  (db/start-node config))\n\n(defmethod ig/halt-key! :service.portal/db [_ node]\n  (db/stop-node node))", "Its own one-line <code>defmethod</code> in the service's <code>system.clj</code>, calling the shared fn. Never <code>derive</code> it to a parent key: the key in the config is the key in the code."],
+};
+function kwStep(id, trail = []) {
+  const box = $("#kw-wizard"); box.innerHTML = ""; $("#kw-result").innerHTML = "";
+  trail.forEach(([q, a]) => box.append(h("div", { class: "small muted" }, q + " → ", h("strong", {}, a))));
+  if (id.startsWith("R:")) {
+    const [cls, title, code, note] = KW_R[id.slice(2)];
+    const res = h("div", { class: "result " + cls }, h("h4", {}, title));
+    const pre = h("pre", {}, h("code", {})); setCode(pre.firstChild, code);
+    res.append(pre, h("div", { html: note }));
+    $("#kw-result").append(res);
+    box.append(h("div", { class: "row", style: "margin-top:10px" }, h("button", { onclick: () => kwStep("start") }, "Start over")));
+    return;
+  }
+  const s = KW[id];
+  box.append(h("p", { style: "margin:8px 0" }, h("strong", {}, s.q)));
+  box.append(h("div", { class: "row" }, s.a.map(([label, next]) => h("button", { onclick: () => kwStep(next, [...trail, [s.q, label]]) }, label))));
+}
+kwStep("start");
+
+/* ---------- §5 Config composer ---------- */
+const SERVICES = {
+  website: { files: ["static-assets.edn", "services/website.edn"], keys: [":service/website", ":service.website/http-server", ":service.website/handler"] },
+  portal: { files: ["db.edn", "http-client.edn", "redis.edn", "static-assets.edn", "services/portal.edn"], keys: [":service/portal", ":service.portal/http-server", ":service.portal/handler", ":service.portal/db", ":service.portal/session-store"] },
+  worker: { files: ["db.edn", "kafka.edn", "services/worker.edn"], keys: [":service/worker", ":service.worker/consumer"] },
+};
+const COMPONENT_KEYS = {
+  "static-assets.edn": [":com.company.static-assets/files"],
+  "db.edn": [":com.company.db/node"],
+  "http-client.edn": [":com.company.http-client/default-client"],
+  "redis.edn": [":com.company.redis/client"],
+  "kafka.edn": [":com.company.kafka/producer"],
+};
+const picked = new Set(["portal"]);
+const picker = $("#svc-picker");
+Object.keys(SERVICES).forEach(s => picker.append(h("button", { "data-s": s, onclick: () => { picked.has(s) ? picked.delete(s) : picked.add(s); renderCfg(); } }, ":service/" + s)));
+function renderCfg() {
+  $$("#svc-picker button").forEach(b => b.classList.toggle("sel", picked.has(b.dataset.s)));
+  const files = ["components/nrepl.edn"], keys = [":nrepl/server"], seen = new Set();
+  const usage = {};
+  picked.forEach(s => SERVICES[s].files.forEach(f => usage[f] = (usage[f] || 0) + 1));
+  picked.forEach(s => {
+    SERVICES[s].files.forEach(f => {
+      const path = f.startsWith("services/") ? f : "components/" + f;
+      if (!seen.has(path)) { seen.add(path); files.push(path); }
+    });
+  });
+  files.forEach(f => {
+    const ck = COMPONENT_KEYS[f.replace("components/", "")];
+    if (ck) ck.forEach(k => keys.push({ k, shared: usage[f.replace("components/", "")] > 1 }));
+  });
+  picked.forEach(s => SERVICES[s].keys.forEach(k => keys.push(k)));
+  $("#cfg-files").innerHTML = files.map(f => `#include "system/${esc(f)}"`).join("<br>");
+  $("#cfg-keys").innerHTML = picked.size === 0 ? `<span class="muted">Only :nrepl/server</span>` :
+    keys.map(k => typeof k === "string" ? esc(k) : `<span class="${k.shared ? "shared" : ""}">${esc(k.k)}</span>`).join("<br>");
+}
+renderCfg();
+
+/* ---------- §6 Route explorer ---------- */
+const ROUTES = [
+  { m: "GET", p: "/products", name: "::index", data: { handler: "#'index", "::layout/page": ":sidebar" }, returns: "{:res/hiccup (product.views/index …)}" },
+  { m: "POST", p: "/products", name: "::index", data: { handler: "#'create!", parameters: "{:form product/CreateParams}", "::auth/permissions": "[:permission/manage-products]" }, returns: "{:res/redirect (req/route-url req ::show {:id id})}" },
+  { m: "GET", p: "/products/:id", name: "::show", data: { handler: "#'show", parameters: "{:path [:map [:id product/Id]]}", "::layout/page": ":sidebar" }, loads: true, returns: "{:res/hiccup (product.views/show …)}" },
+  { m: "PATCH", p: "/products/:id", name: "::show", data: { handler: "#'update!", parameters: "{:path [:map [:id product/Id]]\n              :form product/UpdateParams}", "::auth/permissions": "[:permission/manage-products]" }, loads: true, returns: "{:res/hiccup (product.views/show …)\n :htmx/trigger [modal/CLOSE_EVENT]}" },
+  { m: "GET", p: "/products/:id/edit-modal", name: "::edit-modal", data: { handler: "#'edit-modal", parameters: "{:path [:map [:id product/Id]]}" }, loads: true, returns: "{:res/hiccup (edit-modal/component …)}" },
+  { m: "GET", p: "/healthz", name: "::healthz", data: { handler: "(constantly {:status 200 :body \"OK\"})" }, ring: true },
+];
+const STACK = [
+  { n: "exception/create-exception-middleware", when: () => true },
+  { n: "cookies/wrap-cookies", when: () => true },
+  { n: "parameters/parameters-middleware", when: () => true },
+  { n: "reitit.muuntaja/format-middleware", when: () => true },
+  { n: "rrc/coerce-exceptions-middleware", when: d => !!d.parameters, key: ":parameters" },
+  { n: "rrc/coerce-request-middleware", when: d => !!d.parameters, key: ":parameters", id: "coerce" },
+  { n: "[tools.ring/wrap-merge config]", when: () => true },
+  { n: "auth/session-middleware", when: () => true },
+  { n: "response/middleware", when: () => true, id: "response" },
+  { n: "auth/permissions-middleware", when: d => !!d["::auth/permissions"], key: "::auth/permissions", id: "perm" },
+  { n: "layout/page-middleware", when: d => !!d["::layout/page"], key: "::layout/page", id: "layout" },
+];
+let routeIdx = 2;
+const rl = $("#route-list");
+ROUTES.forEach((r, i) => rl.append(h("button", { "data-i": i, onclick: () => { routeIdx = i; renderRoute(); } }, h("span", { class: "method m-" + r.m }, r.m), r.p)));
+["opt-hx", "opt-perm", "opt-valid", "opt-found"].forEach(id => $("#" + id).addEventListener("change", renderRoute));
+function renderRoute() {
+  const r = ROUTES[routeIdx], d = r.data;
+  $$("#route-list button").forEach(b => b.classList.toggle("sel", +b.dataset.i === routeIdx));
+  const method = r.m.toLowerCase();
+  const inner = Object.entries(d).map(([k, v]) => (k.startsWith("::") ? k : ":" + k) + " " + v).join("\n          ");
+  setCode($("#route-data"), `["${r.p}"\n {:name ${r.name}\n  :${method} {${inner}}}]`);
+  const hx = $("#opt-hx").checked, perm = $("#opt-perm").checked, valid = $("#opt-valid").checked, found = $("#opt-found").checked;
+  // Determine where the request stops.
+  let stopAt = null, steps = [], cls = "ok";
+  if (d.parameters && !valid) { stopAt = "coerce"; steps.push("Coercion fails at router-compiled <code>coerce-request-middleware</code> → <strong>400</strong> with humanized errors."); cls = "err"; }
+  else if (d["::auth/permissions"] && !perm) { stopAt = "perm"; steps.push(`<code>permissions-middleware</code> denies → ${hx ? "<strong>403</strong> (htmx shows an alert)" : "<strong>unauthorized page</strong>"}.`); cls = "err"; }
+  else if (r.loads && !found) { steps.push("Handler calls <code>(current-product req)</code> → <code>response/not-found!</code> throws <code>{:type ::response/not-found}</code> → exception middleware → <strong>404</strong>."); cls = "warn"; }
+  else if (r.ring) { steps.push("Handler returns a Ring response; <code>response/middleware</code> passes it through → <strong>200 text/plain</strong>."); }
+  else {
+    steps.push(`Handler <code>${esc(d.handler)}</code> returns <code>${esc(r.returns.replace(/\n\s*/g, " "))}</code>.`);
+    if (d["::layout/page"]) steps.push(hx ? "<code>layout/page-middleware</code>: htmx request → leaves the fragment as is." : "<code>layout/page-middleware</code>: no <code>HX-Request</code> → wraps hiccup in the full page shell with sidebar.");
+    if (r.returns.includes(":res/redirect")) steps.push("<code>response/middleware</code> → <strong>303</strong> redirect.");
+    else steps.push(`<code>response/middleware</code> renders → <strong>200 text/html</strong> (${d["::layout/page"] && !hx ? "full page" : "fragment"})${r.returns.includes("htmx/trigger") ? " with <code>HX-Trigger: close_modal</code>" : ""}.`);
+  }
+  let stopped = false;
+  $("#route-stack").innerHTML = STACK.map(mw => {
+    const on = mw.when(d);
+    let c = on ? "on" : "off", why = on ? (mw.key ? `mounted: route declares ${mw.key}` : "always") : `skipped: no ${mw.key}`;
+    if (stopped) c += " off";
+    if (on && mw.id === stopAt) { c = "stop"; why = "request stops here"; stopped = true; }
+    return `<li class="${c}"><code>${esc(mw.n)}</code><span class="why">${esc(why)}</span></li>`;
+  }).join("");
+  const t = $("#route-trace"); t.className = "result " + cls;
+  t.innerHTML = `<h4>What happens</h4><ol class="trace">${steps.map(s => `<li>${s}</li>`).join("")}</ol>`;
+}
+renderRoute();
+
+/* ---------- §7 Frontend chooser ---------- */
+const FE = [
+  ["offline", "Must work offline or be installable as a PWA"],
+  ["state", "Large client-side state: many derived views, drag & drop across views, undo"],
+  ["realtime", "Real-time collaborative editing"],
+  ["widget", "One rich widget (editor, canvas, diagram) in an otherwise form/CRUD app"],
+  ["mobile", "Native mobile app with server-driven screens"],
+];
+FE.forEach(([k, t]) => $("#fe-questions").append(h("label", { class: "check" }, h("input", { type: "checkbox", "data-k": k, onchange: renderFe }), t)));
+function renderFe() {
+  const on = new Set($$("#fe-questions input:checked").map(i => i.dataset.k));
+  let title, body, cls = "ok";
+  if (on.has("offline")) { title = "Replicant or re-frame + service worker"; body = "Client owns state while offline; sync with the server through a data API. Keep pure logic in <code>.cljc</code> to share it with the server."; cls = "warn"; }
+  else if (on.has("state") || on.has("realtime")) { title = on.has("state") ? "Replicant (or re-frame for very large state)" : "Replicant"; body = "Data-driven hiccup rendering with pure functions. Choose re-frame when the team already knows it and state is large with many subscriptions. Server pages around the app can stay hypermedia."; cls = "warn"; }
+  else if (on.has("widget")) { title = "HTMX + a ClojureScript island"; body = "Server renders the page; a <code>*_ui.cljs</code> controller attaches to the widget's element via <code>htmx/on-load</code>. Shared logic in <code>.cljc</code>."; }
+  else { title = "Server-rendered hiccup + HTMX"; body = "Hyperscript or a few lines of JS for tiny local behavior. Full page or fragment from the same URL."; }
+  if (on.has("mobile")) body += "<br><br><strong>Mobile:</strong> Hyperview (HXML) — same hypermedia principles, server decides screens and actions.";
+  const r = $("#fe-result"); r.className = "result " + cls; r.innerHTML = `<h4>${title}</h4>${body}`;
+}
+renderFe();
+
+/* ---------- §8 Multimethods ---------- */
+const MM = {
+  "Job handlers": {
+    avoid: `(defmulti run-job :job/type)\n\n(defmethod run-job "send-invoice.v1" [job]\n  …)\n\n;; Which types exist? Depends on which\n;; namespaces happened to be loaded.`,
+    prefer: `(def job-handlers\n  {"send-invoice.v1" #'invoice.jobs/send-invoice\n   "purge-drafts.v1" #'draft.jobs/purge})\n\n(defn run-job [job]\n  (if-let [f (get job-handlers (:job/type job))]\n    (f job)\n    (throw (ex-info "Unknown job type" {:job job}))))`,
+    why: "The map is the complete, printable list of job types. Go-to-definition on <code>#'invoice.jobs/send-invoice</code> lands on the code. A missing <code>require</code> is a compile error, not silently missing behavior.",
+  },
+  "Routing": {
+    avoid: `(defmulti handle (fn [req] (:route req)))\n\n(defmethod handle :product/show [req]\n  …)`,
+    prefer: `(defn routes []\n  [["/products/:id"\n    {:name ::show\n     :parameters {:path [:map [:id product/Id]]}\n     :get {:handler #'show\n           ::layout/page :sidebar}}]])`,
+    why: "The route table is data you can grep by path, print at the REPL, and validate. Route data drives compiled middleware.",
+  },
+  "Middleware": {
+    avoid: `;; at namespace load time, somewhere\n(register-extension!\n  {:key ::authorize\n   :before wrap-authorized})`,
+    prefer: `;; server.clj — the only place middleware is installed\n:middleware [exception-middleware\n             parameters/parameters-middleware\n             response/middleware\n             auth/permissions-middleware\n             layout/page-middleware]`,
+    why: "Reading one vector tells you everything a request goes through. Each entry uses <code>:compile</code> to mount only where its route-data key is declared.",
+  },
+  "Rendering by type": {
+    avoid: `(defmulti render-field :field/type)\n(defmethod render-field :field.type/text [f] …)\n(defmethod render-field :field.type/date [f] …)`,
+    prefer: `(defn render-field [field]\n  (case (:field/type field)\n    :field.type/text (text-input field)\n    :field.type/date (date-input field)))`,
+    why: "All cases in one place, exhaustive at a glance; each branch is a direct call.",
+  },
+  "Derived keys": {
+    avoid: `;; system.edn
+{:service.web/http-server {…}}
+
+;; system.clj
+(derive :service.web/http-server :system/http-server)
+
+;; somewhere else
+(defmethod ig/init-key :system/http-server [_ config]
+  (jetty/run-jetty …))`,
+    prefer: `;; system.edn
+{:service.web/http-server {…}}
+
+;; service-01-web.system
+(defmethod ig/init-key :service.web/http-server [_ config]
+  (tools.jetty/run-jetty config))`,
+    why: "The key in the config is the key in the code: grep lands on the method. <code>derive</code> only saves a one-line <code>defmethod</code> per instance. Keep it only for hierarchies a library owns (Duct modules).",
+  },
+  "Integrant (allowed)": {
+    avoid: `;; Avoid: ad-hoc start/stop functions wired by hand\n(def producer (atom nil))\n(defn start! [] (reset! producer (start-producer cfg)))`,
+    prefer: `(defmethod ig/init-key ::producer [_ config]\n  (start-producer config))\n\n(defmethod ig/halt-key! ::producer [_ producer]\n  (stop-producer producer))`,
+    why: "Integrant's multimethods are the library's extension point: correct use of <code>defmethod</code>. Keep the body one line that delegates to a plain function.",
+  },
+};
+let mmSel = "Job handlers";
+Object.keys(MM).forEach(k => $("#mm-picker").append(h("button", { "data-k": k, onclick: () => { mmSel = k; renderMm(); } }, k)));
+function renderMm() {
+  $$("#mm-picker button").forEach(b => b.classList.toggle("sel", b.dataset.k === mmSel));
+  const m = MM[mmSel];
+  setCode($("#mm-avoid"), m.avoid); setCode($("#mm-prefer"), m.prefer);
+  $("#mm-why").innerHTML = m.why;
+}
+renderMm();
+
+/* ---------- §9 Name linter ---------- */
+const SUGGEST = {
+  "server-utils/is-htmx-request?": "tools.htmx/client-request?",
+  "utils/format-date": "tools.date/format-iso",
+  "helpers/dom-id": "tools.dom/id",
+  "utils/->base64": "tools.base64/encode",
+  "common/find-first": "medley.core/find-first (or tools.coll/find-first)",
+  "utils/bearer-token": "tools.ring-request/bearer-token",
+  "utils/validate-config": "tools.malli/throwing-coercer",
+};
+const BANNED = /(^|[.\-])(utils?|helpers?|common|misc|shared|stuff)($|[.\-])/;
+function lint() {
+  const v = $("#lint").value.trim(), out = $("#lint-out"); out.innerHTML = "";
+  const [ns, fn] = v.includes("/") ? v.split("/") : ["", v];
+  const issues = [];
+  if (!ns) issues.push(["warn", "Give the full name: <code>namespace/function</code>."]);
+  if (ns && BANNED.test(ns)) issues.push(["err", `<code>${esc(ns)}</code> is a grab-bag name. Name the concern instead (<code>tools.htmx</code>, <code>tools.date</code>, <code>request</code> …).`]);
+  if (/^is-/.test(fn)) issues.push(["err", "Drop the <code>is-</code> prefix; predicates end in <code>?</code>."]);
+  else if (/^(is|has|can)[A-Z-]/.test(fn) && !fn.endsWith("?")) issues.push(["err", "Predicate should end in <code>?</code>."]);
+  const last = ns.split(".").pop();
+  if (last && fn.split("-").some(part => part.replace("?", "") === last)) issues.push(["warn", `Name repeats the namespace (<code>${esc(last)}</code>). The namespace already supplies the context.`]);
+  if (ns.startsWith("tools.") && /(user|product|order|invoice|portal|service)/.test(fn)) issues.push(["warn", "Looks domain-specific. <code>tools.*</code> must stay domain-agnostic; move it to <code>com.company.&lt;concern&gt;</code>."]);
+  if (SUGGEST[v]) issues.push(["ok", `Suggested: <code>${esc(SUGGEST[v])}</code>`]);
+  if (!issues.length) issues.push(["ok", "Looks good: concern-named namespace, function name doesn't repeat it."]);
+  issues.forEach(([c, t]) => out.append(h("li", {}, h("span", { class: "pill " + (c === "ok" ? "ok" : c === "err" ? "err" : "") }, c === "ok" ? "OK" : c === "err" ? "FIX" : "CHECK"), h("span", { html: " " + t }))));
+}
+$("#lint").addEventListener("input", lint);
+$$("[data-lint]").forEach(b => b.addEventListener("click", () => { $("#lint").value = b.dataset.lint; lint(); }));
+lint();
+
+/* ---------- §10 Style before/after ---------- */
+const STYLE_BEFORE = `(defn update-product! [db-node product-id attrs]
+  (when-let [product (find-by-id (db/db db-node)
+                                 product-id)]
+    (db/merge! db-node
+               product-id
+               (merge attrs
+                 {:product/updated-at (date/now)}))))
+
+(def roles [{:role/id :role/admin}
+  {:role/id :role/member}])
+
+(or (find-in-cache id)
+  (find-in-db db id))`;
+const STYLE_AFTER = `(defn update-product! [db-node product-id attrs]
+  (when-let [product (find-by-id (db/db db-node)
+                       product-id)]
+    (db/merge! db-node
+      product-id
+      (merge attrs
+        {:product/updated-at (date/now)}))))
+
+(def roles [{:role/id :role/admin}
+            {:role/id :role/member}])
+
+(or (find-in-cache id)
+    (find-in-db db id))`;
+function renderStyle(after) {
+  $("#style-before").classList.toggle("sel", !after); $("#style-after").classList.toggle("sel", after);
+  setCode($("#style-code"), after ? STYLE_AFTER : STYLE_BEFORE);
+}
+$("#style-before").addEventListener("click", () => renderStyle(false));
+$("#style-after").addEventListener("click", () => renderStyle(true));
+renderStyle(true);
+
+/* ---------- §12 Checklist ---------- */
+const CL = [
+  "Copy artifacts/ dotfiles to the repo root; copy env.example to .env",
+  "Create com.company.{system, config, env, request} and tools.{integrant, malli, htmx, response, ring, jetty}",
+  "Create resources/system/system.edn with one #service block per service + services/<name>.edn",
+  "Per service: service-NN-name.{main, system, server} and views.layout",
+  "Per entity: <entity>.cljc with schemas first",
+  "Per entity: <entity>.db, <entity>.views, <entity>.routes; add (routes) to server.clj",
+  "Cross-cutting needs declared as route data (::auth/permissions, ::layout/page)",
+  "Copy artifacts/dev/user.clj (go/reset + Portal), dev/dev_opts.edn.example, system-namespaces entry",
+  "build.clj target for the service",
+  "bb fmt, bb lint, (go), open the service URL",
+];
+const CL_KEY = "clj-spec-checklist";
+const clState = JSON.parse(localStorage.getItem(CL_KEY) || "[]");
+function renderCl() {
+  const box = $("#cl"); box.innerHTML = "";
+  CL.forEach((t, i) => box.append(h("label", { class: "check" },
+    h("input", { type: "checkbox", checked: !!clState[i], onchange: e => { clState[i] = e.target.checked; localStorage.setItem(CL_KEY, JSON.stringify(clState)); renderCl(); } }),
+    h("span", { style: clState[i] ? "text-decoration:line-through;color:var(--muted)" : "" }, t))));
+  $("#cl-bar").style.width = (100 * clState.filter(Boolean).length / CL.length) + "%";
+}
+$("#cl-reset").addEventListener("click", () => { clState.length = 0; localStorage.removeItem(CL_KEY); renderCl(); });
+renderCl();
+</script>
+</body>
+</html>

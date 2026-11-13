@@ -1,0 +1,26 @@
+{:source-aliases #{:dev :test :build}
+
+ ;; Every custom macro is declared here or has a hook in .clj-kondo/hooks/
+ :lint-as {com.company.test.system/with-test-system clojure.core/let}
+
+ :linters
+ {:clojure-lsp/unused-public-var {:exclude-when-contains-meta #{:lsp/allow-unused}}
+  :consistent-alias {:aliases {clojure.set        set
+                               clojure.string     str
+                               clojure.java.io    io
+                               integrant.core     ig
+                               malli.core         m
+                               malli.util         mu
+                               reitit.core        r
+                               reitit.ring        ring}}
+  :redundant-fn-wrapper {:level :warning}
+  :unsorted-required-namespaces {:level :warning}
+  :single-key-in {:level :warning}
+  :docstring-leading-trailing-whitespace {:level :warning}}
+
+ ;; Rich comment blocks are scratch space
+ :config-in-comment
+ {:linters {:duplicate-require {:level :off}
+            :redundant-expression {:level :off}
+            :unresolved-namespace {:level :off}
+            :unsorted-required-namespaces {:level :off}}}}

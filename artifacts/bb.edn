@@ -1,0 +1,26 @@
+{:tasks
+ {nrepl
+  {:doc "Start nREPL with dev tooling. Then (go) / (reset) from user.clj"
+   :task (clojure "-M:dev:nrepl")}
+
+  fmt
+  {:doc "Format all Clojure and EDN files with cljfmt"
+   :task (shell "cljfmt fix")}
+
+  fmt:check
+  {:doc "Check formatting (CI)"
+   :task (shell "cljfmt check")}
+
+  lint
+  {:doc "Lint with clj-kondo"
+   :task (shell "clj-kondo --lint src test dev")}
+
+  test
+  {:doc "Run tests. Extra args are passed to the test runner, e.g. bb test :nses '[my.ns-test]'"
+   :task (apply clojure "-X:test" *command-line-args*)}
+
+  uber
+  {:doc "Build the uberjar of one service: bb uber website"
+   :task (let [service (or (first *command-line-args*)
+                           (throw (ex-info "Usage: bb uber <service-name>" {})))]
+           (clojure "-T:build" "uber" ":service" service))}}}
