@@ -83,7 +83,7 @@ separate projects.
 │   ├── tools/               ; domain-agnostic helpers (see §9)
 │   ├── views/               ; shared UI components
 │   ├── service_01_website/
-│   ├── service_02_portal/
+│   ├── service_02_dashboard/
 │   └── service_03_worker/
 └── test/com/company/…       ; mirrors src
 ```
@@ -177,24 +177,24 @@ Layers:
 | `<entity>.views.<part>` | Larger sub-views (`views.edit-modal`, `views.list`)        | same as `.views`                     |
 | `<feature>.*`    | Same layers for features that span entities (`onboarding.routes`) | models it orchestrates               |
 
-Example for a portal service:
+Example for a dashboard service:
 
 ```
-com.company.service-02-portal.main
-com.company.service-02-portal.system
-com.company.service-02-portal.server            ; router + middleware stack
-com.company.service-02-portal.views.layout      ; page shell, sidebar
-com.company.service-02-portal.views.modal       ; modal component + events
-com.company.service-02-portal.product           ; model (cljc)
-com.company.service-02-portal.product.db
-com.company.service-02-portal.product.routes
-com.company.service-02-portal.product.views
-com.company.service-02-portal.product.views.edit-modal
-com.company.service-02-portal.team.routes       ; feature spanning user + role
-com.company.service-02-portal.team.views
-com.company.user                                ; model shared by services
-com.company.mailer                              ; shared concern / component
-com.company.tools.htmx                          ; domain-agnostic tool
+com.company.service-02-dashboard.main
+com.company.service-02-dashboard.system
+com.company.service-02-dashboard.server            ; router + middleware stack
+com.company.service-02-dashboard.views.layout      ; page shell, sidebar
+com.company.service-02-dashboard.views.modal       ; modal component + events
+com.company.service-02-dashboard.product           ; model (cljc)
+com.company.service-02-dashboard.product.db
+com.company.service-02-dashboard.product.routes
+com.company.service-02-dashboard.product.views
+com.company.service-02-dashboard.product.views.edit-modal
+com.company.service-02-dashboard.team.routes       ; feature spanning user + role
+com.company.service-02-dashboard.team.views
+com.company.user                                   ; model shared by services
+com.company.mailer                                 ; shared concern / component
+com.company.tools.htmx                             ; domain-agnostic tool
 ```
 
 ### 2.2 Rules
@@ -267,7 +267,7 @@ route data understood by a middleware, UI state, internal maps) MUST be fully
 qualified to the namespace that owns them, written with `::`:
 
 ```clojure
-;; owned by com.company.service-02-portal.views.modal
+;; owned by com.company.service-02-dashboard.views.modal
 {::modal/is-open true}
 
 ;; owned by com.company.kafka
@@ -317,25 +317,25 @@ The key written in the config is the key of its `defmethod`. Grep a key from
 `system.edn` and you land on its `ig/init-key`. Therefore:
 
 - MUST NOT `derive` Integrant keys, use composite keys (`[:a/x :b/y]`, which
-  `derive` under the hood), or `#ig/ref`/`#ig/refset` a parent key (§8.4).
+  `derive` under the hood), or `#ig/ref`/`#ig/refset` a parent key (§8.5).
 - **Component keys** — fully qualified to the namespace holding the
   `defmethod`s, for components a system has once:
   `:com.company.kafka/producer`, `:com.company.redis/client`,
   `:com.company.tools.db-scheduler/db-store`.
 - **Service instance keys** — `:service/<name>` and `:service.<name>/<thing>`,
   for components that exist per service or more than once:
-  `:service/portal`, `:service.portal/http-server`, `:service.portal/db`.
+  `:service/dashboard`, `:service.dashboard/http-server`, `:service.dashboard/db`.
   Each has its own `defmethod` in the service's `system.clj`: one line that
   calls the shared plain function.
 
 ```clojure
-(defmethod ig/init-key :service.portal/db [_ config]
+(defmethod ig/init-key :service.dashboard/db [_ config]
   (db/start-node config))
 
-(defmethod ig/halt-key! :service.portal/db [_ node]
+(defmethod ig/halt-key! :service.dashboard/db [_ node]
   (db/stop-node node))
 
-(defmethod ig/init-key :service.portal/session-store [_ config]
+(defmethod ig/init-key :service.dashboard/session-store [_ config]
   (session-store/make config))
 ```
 
@@ -371,10 +371,10 @@ Route names are mechanical keys owned by the routes namespace: `::index`,
   set once in `com.company.tools.malli`.
 
 ```clojure
-(ns com.company.service-02-portal.product
+(ns com.company.service-02-dashboard.product
   "A product groups data streams for a business audience."
   (:require
-    [com.company.service-02-portal.domain :as domain]
+    [com.company.service-02-dashboard.domain :as domain]
     [malli.core :as m]
     [malli.util :as mu]))
 
@@ -469,12 +469,12 @@ Route names are mechanical keys owned by the routes namespace: `::index`,
             #include "system/components/static-assets.edn"
             #include "system/services/website.edn"]
 
-  #service [:service/portal
+  #service [:service/dashboard
             #include "system/components/db.edn"
             #include "system/components/http-client.edn"
             #include "system/components/redis.edn"
             #include "system/components/static-assets.edn"
-            #include "system/services/portal.edn"]
+            #include "system/services/dashboard.edn"]
 
   #service [:service/worker
             #include "system/components/db.edn"
@@ -486,24 +486,24 @@ Service file — root key refs the server, the handler config lists every
 dependency the request needs:
 
 ```clojure
-{:service/portal
- {:http-server #ig/ref :service.portal/http-server}
+{:service/dashboard
+ {:http-server #ig/ref :service.dashboard/http-server}
 
- :service.portal/http-server
- {:jetty/options #ref [:service.portal.jetty/options]
-  :handler       #ig/ref :service.portal/handler}
+ :service.dashboard/http-server
+ {:jetty/options #ref [:service.dashboard.jetty/options]
+  :handler       #ig/ref :service.dashboard/handler}
 
- :service.portal.jetty/options
- {:port   #long #or [#env PORTAL_SERVICE_PORT 3002]
+ :service.dashboard.jetty/options
+ {:port   #long #or [#env DASHBOARD_SERVICE_PORT 3002]
   :join?  false}
 
- :service.portal/handler
- {:com.company.db/node                       #ig/ref :service.portal/db
+ :service.dashboard/handler
+ {:com.company.db/node                       #ig/ref :service.dashboard/db
   :com.company.static-assets/files           #ig/ref :com.company.static-assets/files
   :com.company.feature-flags/enabled-features #include "system/components/enabled-features.edn"
-  :com.company.mailer/mailer                 #profile {:dev  #ig/ref :service.portal/browser-mailer
-                                                       :test #ig/ref :service.portal/memory-mailer
-                                                       :production #ig/ref :service.portal/smtp-mailer}
+  :com.company.mailer/mailer                 #profile {:dev  #ig/ref :service.dashboard/browser-mailer
+                                                       :test #ig/ref :service.dashboard/memory-mailer
+                                                       :production #ig/ref :service.dashboard/smtp-mailer}
   :com.company.error-pages/error-handler     #profile {:default :generic :dev :stacktrace}}}
 ```
 
@@ -567,9 +567,9 @@ secrets; `.env.local` is gitignored.
 - `defmethod`s for a key live in the namespace the key is qualified with. For
   `:service.*` keys they live in that service's `system.clj`.
 - No pass-through keys. Plain config is inlined with Aero `#ref`/`#include`.
-  The service root key (`:service/portal`), which only pulls the service's
+  The service root key (`:service/dashboard`), which only pulls the service's
   components into `ig/init`, gets an explicit one-line method:
-  `(defmethod ig/init-key :service/portal [_ config] config)`.
+  `(defmethod ig/init-key :service/dashboard [_ config] config)`.
 - `com.company.tools.integrant/init-system!` wraps `ig/init` and halts the
   partially started system when a component throws.
 - `run-system!` logs the resolved config (secrets print masked) before init.
@@ -631,15 +631,15 @@ raw keys; `com.company.request` exposes accessors:
   **compiled middleware** (§6.2), never by wrapping individual handlers by hand.
 
 ```clojure
-(ns com.company.service-02-portal.product.routes
+(ns com.company.service-02-dashboard.product.routes
   (:require
     [com.company.auth :as-alias auth]
     [com.company.request :as req]
-    [com.company.service-02-portal.product :as product]
-    [com.company.service-02-portal.product.db :as product.db]
-    [com.company.service-02-portal.product.views :as product.views]
-    [com.company.service-02-portal.views.layout :as-alias layout]
-    [com.company.service-02-portal.views.modal :as modal]
+    [com.company.service-02-dashboard.product :as product]
+    [com.company.service-02-dashboard.product.db :as product.db]
+    [com.company.service-02-dashboard.product.views :as product.views]
+    [com.company.service-02-dashboard.views.layout :as-alias layout]
+    [com.company.service-02-dashboard.views.modal :as modal]
     [com.company.tools.response :as response]))
 
 (defn- current-product [req]
@@ -747,13 +747,13 @@ Rules:
 ### 6.3 The router: one explicit middleware stack
 
 ```clojure
-(ns com.company.service-02-portal.server
+(ns com.company.service-02-dashboard.server
   (:require
     [com.company.auth :as auth]
     [com.company.error-pages :as error-pages]
-    [com.company.service-02-portal.product.routes :as product.routes]
-    [com.company.service-02-portal.team.routes :as team.routes]
-    [com.company.service-02-portal.views.layout :as layout]
+    [com.company.service-02-dashboard.product.routes :as product.routes]
+    [com.company.service-02-dashboard.team.routes :as team.routes]
+    [com.company.service-02-dashboard.views.layout :as layout]
     [com.company.tools.response :as response]
     [com.company.tools.ring :as tools.ring]
     [muuntaja.core :as muuntaja]
@@ -899,10 +899,14 @@ island is cheap; moving from an SPA back is not.
 
 ### 8.1 Rule
 
-When we control every case of a dispatch, write it as data and functions:
-a map, a vector, a `case`, or a `cond`. Reach for multimethods (or global
-registries) only at genuine extension points owned by a library or meant for
-code we do not control.
+Default to data and functions: a map, a vector, a `case`, or a `cond`.
+
+- Routing and middleware MUST be data: Reitit route tables with handler vars
+  and one explicit middleware vector (§6). No multimethods, registries, or
+  load-time registration.
+- Everything else SHOULD be data and functions. Multimethods are allowed at
+  library extension points, in plugin systems, and, if the conditions in §8.3
+  hold, for job handlers and rendering by type.
 
 | Allowed `defmethod`                                     | Why                                    |
 |---------------------------------------------------------|----------------------------------------|
@@ -910,17 +914,15 @@ code we do not control.
 | `aero/reader`                                           | Aero's extension point                 |
 | `print-method`, `print-dup`                             | Clojure's extension point              |
 | Plugin systems where third parties add cases            | Openness is the requirement            |
+| Job handlers, rendering by type                         | MAY, depending on context (§8.3)       |
 
 | Instead of                                                    | Prefer                                                      |
 |---------------------------------------------------------------|-------------------------------------------------------------|
 | `defmulti handle-route` dispatching on route keyword          | Reitit route table with handler vars                        |
-| `defmulti run-job` on `:job/type`                             | `(def job-handlers {"send-invoice.v1" #'send-invoice …})`   |
-| `defmulti render` on entity type                              | `case` or a map of render fns in the view namespace         |
 | Middleware registered into an atom at namespace load          | Explicit middleware vector in `server.clj` + `:compile`     |
 | Schemas registered by keyword in a global registry            | Schema vars (`product/Product`)                             |
 | Macro that generates handlers + routes + middleware           | Plain `defn` handlers + route data                          |
-| `derive` hierarchies for domain logic                         | Explicit predicates or sets (`#{:role/admin :role/owner}`)  |
-| `(derive :service.web/http-server :system/http-server)`       | One `defmethod` per config key, calling a plain fn (§3.4)   |
+| `defmulti` over a closed set that one namespace owns          | `case`, or a map of vars, in that namespace                 |
 
 ### 8.2 Why
 
@@ -933,19 +935,69 @@ code we do not control.
 - **Agents.** An AI agent following references in a codebase built from data
   and functions finds the full code path in one pass.
 
-### 8.3 Protocols
+### 8.3 Job handlers and rendering by type
+
+Dispatching jobs on `:job/type`, or rendering on a type key (`:field/type`, a
+content block type), MAY use a multimethod. Which form fits depends on where
+the cases live:
+
+| Context                                                                     | Use                                    |
+|-----------------------------------------------------------------------------|----------------------------------------|
+| A handful of cases, all owned by one namespace                              | `case` or a map of vars                |
+| Cases belong to their features across many namespaces, and adding one should not touch a central file | `defmulti` MAY                         |
+| Callers need the full list of types (admin UI, validation, scheduling)      | A map of vars: the list is the data    |
+
+```clojure
+;; Data: the map is the complete list of job types
+(def job-handlers
+  {"send-invoice.v1" #'invoice.jobs/send-invoice
+   "purge-drafts.v1" #'draft.jobs/purge})
+
+;; Multimethod: each feature owns its job types
+(defmulti run-job
+  "Implementations are required in service-03-worker.system."
+  :job/type)
+
+(defmethod run-job :default [job]
+  (throw (ex-info "Unknown job type" {:job/type (:job/type job)})))
+
+;; com.company.invoice.jobs
+(defmethod jobs/run-job "send-invoice.v1" [job]
+  (send-invoice! job))
+```
+
+When you use a multimethod:
+
+- Exactly one composition namespace MUST require every implementing namespace
+  (the service's `system.clj`, or the namespace that starts the worker), so
+  that no case depends on what happened to be loaded.
+- The `:default` method MUST throw `ex-info` with the dispatch value, or
+  render an explicit fallback. It MUST NOT return `nil` silently.
+- Dispatch values MUST be grep-able literals (`"send-invoice.v1"`,
+  `:field.type/date`), not computed.
+- Method bodies SHOULD be one call to a plain function, which the REPL and
+  tests call directly.
+- MUST NOT be used for routing or middleware (§8.1).
+
+### 8.4 Protocols
 
 Protocols are for genuine polymorphism over interchangeable implementations
 (storage backends: S3, Azure Blob, filesystem, in-memory). The implementation
 is selected by the system config (§5), never by runtime type sniffing in
 domain code.
 
-### 8.4 Derived keywords
+### 8.5 Derived keywords
 
-`derive` is dispatch through a hidden global hierarchy, so it gets the same
-rule as multimethods. The config says `:service.web/http-server`, the code says
-`:system/http-server`, and the link between them is a `derive` call in a third
-place that only exists if its namespace was loaded.
+`derive` is a separate decision from multimethods, and a stricter one: there is
+no context where we derive keys we own. A hierarchy is global state that is
+invisible at the call site. The config says `:service.web/http-server`, the
+code says `:system/http-server`, and the link between them is a `derive` call
+in a third place that only exists if its namespace was loaded.
+
+- MUST NOT `derive` keys we own: Integrant keys (§3.4) or domain keywords.
+- Domain hierarchies become explicit predicates or sets:
+  `(def admin-roles #{:role/admin :role/owner})`.
+- MAY extend hierarchies a library owns (Duct modules, `:duct/…`).
 
 What `derive` buys in Integrant, and the explicit replacement:
 
@@ -953,7 +1005,7 @@ What `derive` buys in Integrant, and the explicit replacement:
 |---------------------------------------------------------------|--------------------------------------------------------------|
 | Many instances share one implementation without repeating `defmethod`s | One-line `defmethod` per instance calling the shared fn. A few lines of repetition buys a key you can grep. |
 | `#ig/ref :system/db` lets a consumer depend on "whatever DB is configured" | Ref the concrete key. Swap implementations per profile with Aero `#profile`, visible in the config. |
-| `#ig/refset :system/health-check` collects every instance     | List them explicitly: `[#ig/ref :service.portal/db #ig/ref :com.company.redis/client]`. |
+| `#ig/refset :system/health-check` collects every instance     | List them explicitly: `[#ig/ref :service.dashboard/db #ig/ref :com.company.redis/client]`. |
 | Pass-through config keys derive from `:system/config`         | Not Integrant keys at all: inline with Aero `#ref`/`#include` (§5.4). |
 | Libraries ship hierarchies you extend (Duct modules, `:duct/…`) | Allowed: this is the library's extension point, like `ig/init-key` itself. |
 
@@ -1067,12 +1119,12 @@ Configure the editor (Calva, Cursive, Emacs `clojure-mode` with
 ### 10.2 Namespace form
 
 ```clojure
-(ns com.company.service-02-portal.product.routes
+(ns com.company.service-02-dashboard.product.routes
   "Routes for listing, creating and editing products."
   (:require
     [clojure.string :as str]
     [com.company.request :as req]
-    [com.company.service-02-portal.product :as product]
+    [com.company.service-02-dashboard.product :as product]
     [malli.util :as mu])
   (:import
     (java.time Instant)))
@@ -1216,4 +1268,6 @@ When asked to add a feature to an existing project:
 4. New keys: decide domain (§3.1), mechanical (§3.2), or vocabulary (§3.3).
 5. New helper: find its concern (§9). If none exists, create
    `tools.<concern>`; never `utils`.
-6. No new multimethods unless the case is in §8.1's allowed table.
+6. No new multimethods outside §8.1's allowed table; job handlers and
+   rendering by type only under §8.3's conditions. Never `derive` keys we own
+   (§8.5).

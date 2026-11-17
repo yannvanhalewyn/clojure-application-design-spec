@@ -44,8 +44,8 @@
 
 (def system-namespaces
   "Service root key → namespace holding that service's Integrant methods."
-  {:service/website 'com.company.service-01-website.system
-   :service/portal  'com.company.service-02-portal.system})
+  {:service/website   'com.company.service-01-website.system
+   :service/dashboard 'com.company.service-02-dashboard.system})
 
 (defn read-config
   ([] (read-config {:profile :dev}))
@@ -114,7 +114,7 @@
 (comment
   ;; System
   (go)
-  (go [:service/portal])
+  (go [:service/dashboard])
   (reset)
   (halt)
   (keys (current-system))

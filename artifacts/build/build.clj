@@ -5,8 +5,8 @@
 
 (def services
   "Service name → main namespace and the deps.edn aliases it needs."
-  {"website" {:main 'com.company.service-01-website.main :aliases []}
-   "portal"  {:main 'com.company.service-02-portal.main  :aliases []}})
+  {"website"   {:main 'com.company.service-01-website.main   :aliases []}
+   "dashboard" {:main 'com.company.service-02-dashboard.main :aliases []}})
 
 (def class-dir "target/classes")
 

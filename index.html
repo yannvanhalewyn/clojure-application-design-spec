@@ -203,7 +203,7 @@ model  ✗ db / routes / views        views ✗ routes / db        tools.* ✗ a
           <tr><td>Mechanical (request)</td><td><code>::static-assets/files</code>, <code>::feature-flags/enabled-features</code></td><td>Put on the request by the system, read by the owner ns</td></tr>
           <tr><td>Vocabulary (DSL)</td><td><code>:res/hiccup</code>, <code>:htmx/trigger</code></td><td>Short ns, documented once in the owner</td></tr>
           <tr><td>Integrant component</td><td><code>:com.company.kafka/producer</code></td><td>Qualified to the ns with the <code>defmethod</code>s</td></tr>
-          <tr><td>Integrant service instance</td><td><code>:service/portal</code>, <code>:service.portal/http-server</code></td><td>Own one-line <code>defmethod</code> in the service's <code>system.clj</code>; never <code>derive</code>d</td></tr>
+          <tr><td>Integrant service instance</td><td><code>:service/dashboard</code>, <code>:service.dashboard/http-server</code></td><td>Own one-line <code>defmethod</code> in the service's <code>system.clj</code>; never <code>derive</code>d</td></tr>
           <tr><td>Route name</td><td><code>::product.routes/show</code></td><td>Owned by the routes ns; <code>:as-alias</code> elsewhere</td></tr>
         </tbody>
       </table>
@@ -332,13 +332,27 @@ model  ✗ db / routes / views        views ✗ routes / db        tools.* ✗ a
     <!-- 8 -->
     <section id="multimethods" data-title="Functions & data over multimethods" data-num="8">
       <h2>Functions and data over multimethods <span class="specref">SPEC §8</span></h2>
-      <p class="lead">When we control every case, dispatch is data: a map, a vector, <code>case</code>, <code>cond</code>. Multimethods only at extension points owned by a library (Integrant, Aero, <code>print-method</code>) or true plugin systems.</p>
+      <p class="lead">Default to data: a map, a vector, <code>case</code>, <code>cond</code>. Routing and middleware are always data. Job handlers and rendering by type MAY use a multimethod when the cases live with their features. Otherwise multimethods only at library extension points (Integrant, Aero, <code>print-method</code>) or true plugin systems.</p>
       <div class="row ba-toggle" id="mm-picker"></div>
       <div class="grid2">
-        <div><div class="muted small">Avoid</div><pre><code class="clj" id="mm-avoid"></code></pre></div>
-        <div><div class="muted small">Prefer</div><pre><code class="clj" id="mm-prefer"></code></pre></div>
+        <div><div class="muted small" id="mm-left-label">Avoid</div><pre><code class="clj" id="mm-avoid"></code></pre></div>
+        <div><div class="muted small" id="mm-right-label">Prefer</div><pre><code class="clj" id="mm-prefer"></code></pre></div>
       </div>
       <div class="result" id="mm-why"></div>
+      <h3>If you use a multimethod <span class="specref">SPEC §8.3</span></h3>
+      <div class="rule"><span class="badge b-must">MUST</span><div>One composition ns (the service's <code>system.clj</code> or the worker's start ns) requires every implementing namespace.</div></div>
+      <div class="rule"><span class="badge b-must">MUST</span><div><code>:default</code> throws <code>ex-info</code> with the dispatch value, or renders an explicit fallback. Never a silent <code>nil</code>.</div></div>
+      <div class="rule"><span class="badge b-must">MUST</span><div>Dispatch values are grep-able literals: <code>"send-invoice.v1"</code>, <code>:field.type/date</code>.</div></div>
+      <div class="rule"><span class="badge b-should">SHOULD</span><div>Method bodies are one call to a plain function.</div></div>
+      <div class="rule"><span class="badge b-must">MUST NOT</span><div>use one for routing or middleware.</div></div>
+
+      <h3>Derived keywords <span class="specref">SPEC §8.5</span></h3>
+      <p class="muted">A separate, stricter rule: never <code>derive</code> keys we own, Integrant or domain. Domain hierarchies become explicit sets (<code>#{:role/admin :role/owner}</code>). Only hierarchies a library owns (Duct modules) may be extended.</p>
+      <div class="grid2">
+        <div><div class="muted small">Avoid</div><pre><code class="clj" id="derive-avoid"></code></pre></div>
+        <div><div class="muted small">Prefer</div><pre><code class="clj" id="derive-prefer"></code></pre></div>
+      </div>
+      <div class="result">The key in the config is the key in the code: grep lands on the method. <code>derive</code> only saves a one-line <code>defmethod</code> per instance.</div>
     </section>
 
     <!-- 9 -->
@@ -531,20 +545,20 @@ renderPoly();
 
 /* ---------- §2 Namespace explorer ---------- */
 const NS = [
-  { grp: "Service: portal" },
-  { ns: "service-02-portal.main", layer: "service entry", what: "<code>-main</code> → <code>(system/run-system! [:service/portal] :production)</code>. Nothing else.", may: ["system", "service system ns"], not: ["routes", "views"] },
-  { ns: "service-02-portal.system", layer: "service system", what: "One <code>defmethod</code> per <code>:service.portal/*</code> key, each a one-line call to a shared plain fn. No <code>derive</code>. Requires every ns whose <code>defmethod</code>s are needed.", may: ["components", "server", "tools.integrant", "tools.malli"], not: ["other services"] },
-  { ns: "service-02-portal.server", layer: "composition root (HTTP)", what: "Concats feature route tables; the <strong>only</strong> place middleware is installed.", may: ["*.routes", "auth", "views.layout", "tools.response"], not: ["db directly"] },
-  { ns: "service-02-portal.views.layout", layer: "service view", what: "Page shell, sidebar, <code>PAGE_CONTAINER_ID</code>, and the <code>::layout/page</code> compiled middleware.", may: ["shared views.*", "tools.htmx", "tools.hiccup"], not: ["*.routes", "*.db"] },
-  { ns: "service-02-portal.views.modal", layer: "service view", what: "Modal component, <code>ROOT_ID</code>, <code>CLOSE_EVENT</code>, <code>::modal/is-open</code>.", may: ["tools.hyperscript", "tools.dom"], not: ["*.routes", "*.db"] },
+  { grp: "Service: dashboard" },
+  { ns: "service-02-dashboard.main", layer: "service entry", what: "<code>-main</code> → <code>(system/run-system! [:service/dashboard] :production)</code>. Nothing else.", may: ["system", "service system ns"], not: ["routes", "views"] },
+  { ns: "service-02-dashboard.system", layer: "service system", what: "One <code>defmethod</code> per <code>:service.dashboard/*</code> key, each a one-line call to a shared plain fn. No <code>derive</code>. Requires every ns whose <code>defmethod</code>s are needed.", may: ["components", "server", "tools.integrant", "tools.malli"], not: ["other services"] },
+  { ns: "service-02-dashboard.server", layer: "composition root (HTTP)", what: "Concats feature route tables; the <strong>only</strong> place middleware is installed.", may: ["*.routes", "auth", "views.layout", "tools.response"], not: ["db directly"] },
+  { ns: "service-02-dashboard.views.layout", layer: "service view", what: "Page shell, sidebar, <code>PAGE_CONTAINER_ID</code>, and the <code>::layout/page</code> compiled middleware.", may: ["shared views.*", "tools.htmx", "tools.hiccup"], not: ["*.routes", "*.db"] },
+  { ns: "service-02-dashboard.views.modal", layer: "service view", what: "Modal component, <code>ROOT_ID</code>, <code>CLOSE_EVENT</code>, <code>::modal/is-open</code>.", may: ["tools.hyperscript", "tools.dom"], not: ["*.routes", "*.db"] },
   { grp: "Entity: product" },
-  { ns: "service-02-portal.product", layer: "model (cljc)", what: "Schemas (<code>Id</code>, <code>Product</code>, <code>AudienceType</code>, <code>CreateParams</code>, <code>UpdateParams</code>), <code>make</code>, predicates, pure transforms.", may: ["other models", "tools.*"], not: ["product.db", "product.routes", "product.views"] },
-  { ns: "service-02-portal.product.db", layer: "db", what: "Reads take a db value; writes take a node and end in <code>!</code>. <code>…-tx-ops</code> fns return pure tx data.", may: ["product", "com.company.db"], not: ["routes", "views"] },
-  { ns: "service-02-portal.product.views", layer: "views", what: "Pure hiccup fns of a props map. Receive URLs as props; render an action iff its URL is non-nil.", may: ["product", "views.layout", "shared views.*", "tools.*"], not: ["routes", "db", "request"] },
-  { ns: "service-02-portal.product.views.edit-modal", layer: "views (part)", what: "A larger sub-view split out of <code>product.views</code>.", may: ["product", "views.modal"], not: ["routes", "db"] },
-  { ns: "service-02-portal.product.routes", layer: "routes", what: "Plain <code>defn</code> handlers returning intents + <code>(defn routes [] …)</code> table with route names <code>::index</code>, <code>::show</code>.", may: ["product", "product.db", "product.views", "request", "auth (:as-alias)"], not: ["other services"] },
+  { ns: "service-02-dashboard.product", layer: "model (cljc)", what: "Schemas (<code>Id</code>, <code>Product</code>, <code>AudienceType</code>, <code>CreateParams</code>, <code>UpdateParams</code>), <code>make</code>, predicates, pure transforms.", may: ["other models", "tools.*"], not: ["product.db", "product.routes", "product.views"] },
+  { ns: "service-02-dashboard.product.db", layer: "db", what: "Reads take a db value; writes take a node and end in <code>!</code>. <code>…-tx-ops</code> fns return pure tx data.", may: ["product", "com.company.db"], not: ["routes", "views"] },
+  { ns: "service-02-dashboard.product.views", layer: "views", what: "Pure hiccup fns of a props map. Receive URLs as props; render an action iff its URL is non-nil.", may: ["product", "views.layout", "shared views.*", "tools.*"], not: ["routes", "db", "request"] },
+  { ns: "service-02-dashboard.product.views.edit-modal", layer: "views (part)", what: "A larger sub-view split out of <code>product.views</code>.", may: ["product", "views.modal"], not: ["routes", "db"] },
+  { ns: "service-02-dashboard.product.routes", layer: "routes", what: "Plain <code>defn</code> handlers returning intents + <code>(defn routes [] …)</code> table with route names <code>::index</code>, <code>::show</code>.", may: ["product", "product.db", "product.views", "request", "auth (:as-alias)"], not: ["other services"] },
   { grp: "Feature: team (spans user + role)" },
-  { ns: "service-02-portal.team.routes", layer: "feature routes", what: "Same layers as an entity, for a feature orchestrating several models.", may: ["user", "user.db", "team.views"], not: ["other services"] },
+  { ns: "service-02-dashboard.team.routes", layer: "feature routes", what: "Same layers as an entity, for a feature orchestrating several models.", may: ["user", "user.db", "team.views"], not: ["other services"] },
   { grp: "Shared" },
   { ns: "user", layer: "shared model (cljc)", what: "Domain model used by several services.", may: ["other models", "tools.*"], not: ["service namespaces"] },
   { ns: "request", layer: "shared concern", what: "Request accessors: <code>db</code>, <code>db-node</code>, <code>route-url</code>, <code>current-user</code>, <code>authorized?</code>.", may: ["db", "user", "reitit.core"], not: ["service namespaces"] },
@@ -566,7 +580,7 @@ function selectNs(i) {
      <div class="small muted">May require</div><div>${n.may.map(x => `<span class="pill ok">${esc(x)}</span>`).join("")}</div>
      <div class="small muted" style="margin-top:8px">Must not require</div><div>${n.not.map(x => `<span class="pill err">${esc(x)}</span>`).join("")}</div>`;
 }
-selectNs(NS.findIndex(n => n.ns === "service-02-portal.product"));
+selectNs(NS.findIndex(n => n.ns === "service-02-dashboard.product"));
 
 /* ---------- §3 Keyword wizard ---------- */
 const KW = {
@@ -582,7 +596,7 @@ const KW_R = {
   vocab: ["warn", "Vocabulary key: short, documented once", "{:res/hiccup [:div …]\n :htmx/trigger [modal/CLOSE_EVENT]}", "Deliberate exception. Document the full vocabulary in the owner ns docstring and validate with Malli. When unsure, use a mechanical key."],
   mech: ["ok", "Mechanical key: fully qualified with ::", "{::modal/is-open true}\n{::kafka/bucket \"events\"}\n{::auth/permissions [:permission/manage-products]}\n(::static-assets/files req)", "Rename-safe with clojure-lsp, find-references hits every producer and consumer. Require the owner with <code>:as-alias</code> when you only need its keywords. In EDN write the full form <code>:com.company.kafka/bucket</code>."],
   igcomp: ["ok", "Component key: qualified to the implementing ns", ":com.company.kafka/producer\n(defmethod ig/init-key ::producer [_ config]\n  (start-producer config))", "Go-to-namespace from the key lands on the defmethods."],
-  igsvc: ["ok", "Service instance: :service.<name>/<thing>", "(defmethod ig/init-key :service.portal/db [_ config]\n  (db/start-node config))\n\n(defmethod ig/halt-key! :service.portal/db [_ node]\n  (db/stop-node node))", "Its own one-line <code>defmethod</code> in the service's <code>system.clj</code>, calling the shared fn. Never <code>derive</code> it to a parent key: the key in the config is the key in the code."],
+  igsvc: ["ok", "Service instance: :service.<name>/<thing>", "(defmethod ig/init-key :service.dashboard/db [_ config]\n  (db/start-node config))\n\n(defmethod ig/halt-key! :service.dashboard/db [_ node]\n  (db/stop-node node))", "Its own one-line <code>defmethod</code> in the service's <code>system.clj</code>, calling the shared fn. Never <code>derive</code> it to a parent key: the key in the config is the key in the code."],
 };
 function kwStep(id, trail = []) {
   const box = $("#kw-wizard"); box.innerHTML = ""; $("#kw-result").innerHTML = "";
@@ -605,7 +619,7 @@ kwStep("start");
 /* ---------- §5 Config composer ---------- */
 const SERVICES = {
   website: { files: ["static-assets.edn", "services/website.edn"], keys: [":service/website", ":service.website/http-server", ":service.website/handler"] },
-  portal: { files: ["db.edn", "http-client.edn", "redis.edn", "static-assets.edn", "services/portal.edn"], keys: [":service/portal", ":service.portal/http-server", ":service.portal/handler", ":service.portal/db", ":service.portal/session-store"] },
+  dashboard: { files: ["db.edn", "http-client.edn", "redis.edn", "static-assets.edn", "services/dashboard.edn"], keys: [":service/dashboard", ":service.dashboard/http-server", ":service.dashboard/handler", ":service.dashboard/db", ":service.dashboard/session-store"] },
   worker: { files: ["db.edn", "kafka.edn", "services/worker.edn"], keys: [":service/worker", ":service.worker/consumer"] },
 };
 const COMPONENT_KEYS = {
@@ -615,7 +629,7 @@ const COMPONENT_KEYS = {
   "redis.edn": [":com.company.redis/client"],
   "kafka.edn": [":com.company.kafka/producer"],
 };
-const picked = new Set(["portal"]);
+const picked = new Set(["dashboard"]);
 const picker = $("#svc-picker");
 Object.keys(SERVICES).forEach(s => picker.append(h("button", { "data-s": s, onclick: () => { picked.has(s) ? picked.delete(s) : picked.add(s); renderCfg(); } }, ":service/" + s)));
 function renderCfg() {
@@ -721,11 +735,6 @@ renderFe();
 
 /* ---------- §8 Multimethods ---------- */
 const MM = {
-  "Job handlers": {
-    avoid: `(defmulti run-job :job/type)\n\n(defmethod run-job "send-invoice.v1" [job]\n  …)\n\n;; Which types exist? Depends on which\n;; namespaces happened to be loaded.`,
-    prefer: `(def job-handlers\n  {"send-invoice.v1" #'invoice.jobs/send-invoice\n   "purge-drafts.v1" #'draft.jobs/purge})\n\n(defn run-job [job]\n  (if-let [f (get job-handlers (:job/type job))]\n    (f job)\n    (throw (ex-info "Unknown job type" {:job job}))))`,
-    why: "The map is the complete, printable list of job types. Go-to-definition on <code>#'invoice.jobs/send-invoice</code> lands on the code. A missing <code>require</code> is a compile error, not silently missing behavior.",
-  },
   "Routing": {
     avoid: `(defmulti handle (fn [req] (:route req)))\n\n(defmethod handle :product/show [req]\n  …)`,
     prefer: `(defn routes []\n  [["/products/:id"\n    {:name ::show\n     :parameters {:path [:map [:id product/Id]]}\n     :get {:handler #'show\n           ::layout/page :sidebar}}]])`,
@@ -736,28 +745,17 @@ const MM = {
     prefer: `;; server.clj — the only place middleware is installed\n:middleware [exception-middleware\n             parameters/parameters-middleware\n             response/middleware\n             auth/permissions-middleware\n             layout/page-middleware]`,
     why: "Reading one vector tells you everything a request goes through. Each entry uses <code>:compile</code> to mount only where its route-data key is declared.",
   },
-  "Rendering by type": {
-    avoid: `(defmulti render-field :field/type)\n(defmethod render-field :field.type/text [f] …)\n(defmethod render-field :field.type/date [f] …)`,
-    prefer: `(defn render-field [field]\n  (case (:field/type field)\n    :field.type/text (text-input field)\n    :field.type/date (date-input field)))`,
-    why: "All cases in one place, exhaustive at a glance; each branch is a direct call.",
+  "Job handlers": {
+    labels: ["Few types, one owner: data", "Types live with their features: multimethod (MAY)"],
+    avoid: `(def job-handlers\n  {"send-invoice.v1" #'invoice.jobs/send-invoice\n   "purge-drafts.v1" #'draft.jobs/purge})\n\n(defn run-job [job]\n  (if-let [f (get job-handlers (:job/type job))]\n    (f job)\n    (throw (ex-info "Unknown job type" {:job job}))))`,
+    prefer: `;; com.company.jobs\n(defmulti run-job\n  "Implementations are required in service-03-worker.system."\n  :job/type)\n\n(defmethod run-job :default [job]\n  (throw (ex-info "Unknown job type"\n           {:job/type (:job/type job)})))\n\n;; com.company.invoice.jobs\n(defmethod jobs/run-job "send-invoice.v1" [job]\n  (send-invoice! job))`,
+    why: "Both are fine; pick by context. A map is the complete, printable list of job types: use it when one namespace owns them or callers need the list. A multimethod lets each feature own its job types without touching a central file, as long as one composition ns requires every implementation and <code>:default</code> throws.",
   },
-  "Derived keys": {
-    avoid: `;; system.edn
-{:service.web/http-server {…}}
-
-;; system.clj
-(derive :service.web/http-server :system/http-server)
-
-;; somewhere else
-(defmethod ig/init-key :system/http-server [_ config]
-  (jetty/run-jetty …))`,
-    prefer: `;; system.edn
-{:service.web/http-server {…}}
-
-;; service-01-web.system
-(defmethod ig/init-key :service.web/http-server [_ config]
-  (tools.jetty/run-jetty config))`,
-    why: "The key in the config is the key in the code: grep lands on the method. <code>derive</code> only saves a one-line <code>defmethod</code> per instance. Keep it only for hierarchies a library owns (Duct modules).",
+  "Rendering by type": {
+    labels: ["Closed set in one view ns: case", "Types added by features: multimethod (MAY)"],
+    avoid: `(defn render-field [field]\n  (case (:field/type field)\n    :field.type/text (text-input field)\n    :field.type/date (date-input field)))`,
+    prefer: `;; com.company.views.form\n(defmulti render-field :field/type)\n\n(defmethod render-field :default [field]\n  (unknown-field field))\n\n;; com.company.invoice.views\n(defmethod form/render-field :field.type/invoice-line [field]\n  (invoice-line-input field))`,
+    why: "A <code>case</code> keeps all cases in one place, exhaustive at a glance. When features contribute their own types, a multimethod with an explicit <code>:default</code> fallback avoids a central file every feature edits.",
   },
   "Integrant (allowed)": {
     avoid: `;; Avoid: ad-hoc start/stop functions wired by hand\n(def producer (atom nil))\n(defn start! [] (reset! producer (start-producer cfg)))`,
@@ -765,15 +763,32 @@ const MM = {
     why: "Integrant's multimethods are the library's extension point: correct use of <code>defmethod</code>. Keep the body one line that delegates to a plain function.",
   },
 };
-let mmSel = "Job handlers";
+let mmSel = "Routing";
 Object.keys(MM).forEach(k => $("#mm-picker").append(h("button", { "data-k": k, onclick: () => { mmSel = k; renderMm(); } }, k)));
 function renderMm() {
   $$("#mm-picker button").forEach(b => b.classList.toggle("sel", b.dataset.k === mmSel));
   const m = MM[mmSel];
+  const [left, right] = m.labels || ["Avoid", "Prefer"];
+  $("#mm-left-label").textContent = left; $("#mm-right-label").textContent = right;
   setCode($("#mm-avoid"), m.avoid); setCode($("#mm-prefer"), m.prefer);
   $("#mm-why").innerHTML = m.why;
 }
 renderMm();
+setCode($("#derive-avoid"), `;; system.edn
+{:service.web/http-server {…}}
+
+;; system.clj
+(derive :service.web/http-server :system/http-server)
+
+;; somewhere else
+(defmethod ig/init-key :system/http-server [_ config]
+  (jetty/run-jetty …))`);
+setCode($("#derive-prefer"), `;; system.edn
+{:service.web/http-server {…}}
+
+;; service-01-web.system
+(defmethod ig/init-key :service.web/http-server [_ config]
+  (tools.jetty/run-jetty config))`);
 
 /* ---------- §9 Name linter ---------- */
 const SUGGEST = {
@@ -796,7 +811,7 @@ function lint() {
   else if (/^(is|has|can)[A-Z-]/.test(fn) && !fn.endsWith("?")) issues.push(["err", "Predicate should end in <code>?</code>."]);
   const last = ns.split(".").pop();
   if (last && fn.split("-").some(part => part.replace("?", "") === last)) issues.push(["warn", `Name repeats the namespace (<code>${esc(last)}</code>). The namespace already supplies the context.`]);
-  if (ns.startsWith("tools.") && /(user|product|order|invoice|portal|service)/.test(fn)) issues.push(["warn", "Looks domain-specific. <code>tools.*</code> must stay domain-agnostic; move it to <code>com.company.&lt;concern&gt;</code>."]);
+  if (ns.startsWith("tools.") && /(user|product|order|invoice|dashboard|service)/.test(fn)) issues.push(["warn", "Looks domain-specific. <code>tools.*</code> must stay domain-agnostic; move it to <code>com.company.&lt;concern&gt;</code>."]);
   if (SUGGEST[v]) issues.push(["ok", `Suggested: <code>${esc(SUGGEST[v])}</code>`]);
   if (!issues.length) issues.push(["ok", "Looks good: concern-named namespace, function name doesn't repeat it."]);
   issues.forEach(([c, t]) => out.append(h("li", {}, h("span", { class: "pill " + (c === "ok" ? "ok" : c === "err" ? "err" : "") }, c === "ok" ? "OK" : c === "err" ? "FIX" : "CHECK"), h("span", { html: " " + t }))));
@@ -815,7 +830,7 @@ const STYLE_BEFORE = `(defn update-product! [db-node product-id attrs]
                  {:product/updated-at (date/now)}))))
 
 (def roles [{:role/id :role/admin}
-  {:role/id :role/member}])
+            {:role/id :role/member}])
 
 (or (find-in-cache id)
   (find-in-db db id))`;
