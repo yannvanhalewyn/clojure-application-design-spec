@@ -57,7 +57,9 @@
    (go (or (read-dev-opt :go-services) (keys system-namespaces))))
   ([service-keys]
    (run! (comp require system-namespaces) service-keys)
-   (ig.repl/set-prep! #(ig/expand (read-config {:profile :dev :services service-keys})))
+   (ig.repl/set-prep! #(let [config (read-config {:profile :dev :services service-keys})]
+                         (ig/load-namespaces config service-keys)
+                         (ig/expand config)))
    (ig.repl/go service-keys)))
 
 (defn halt []

@@ -98,7 +98,9 @@ separate projects.
   - `main.clj` — `-main` that calls the shared `run-system!` with the
     service's root key and `:production` profile. Nothing else.
   - `system.clj` — Integrant methods for service-specific keys and
-    `require`s of every namespace whose `defmethod`s the service needs.
+    `require`s of every namespace whose `defmethod`s no config key names
+    (multimethod cases, §8.3). Component namespaces load from their keys
+    (§3.4).
   - `server.clj` (HTTP services) — builds the router by concatenating feature
     route tables and declares the middleware stack (§6).
   - `resources/system/services/<name>.edn` — the service's system config.
@@ -276,6 +278,11 @@ qualified to the namespace that owns them, written with `::`:
 ;; route data understood by middleware in com.company.auth
 {::auth/permissions [:permission/manage-products]}
 
+;; structured permissions: keys and actions owned by com.company.permission,
+;; the resource is domain vocabulary (§3.1)
+{::auth/permissions [{::permission/resource :resource/products
+                      ::permission/action   ::permission/update}]}
+
 ;; route data understood by layout middleware
 {::layout/page :sidebar}
 
@@ -295,6 +302,18 @@ producer and consumer; the key cannot collide with another module.
 In EDN (system config) `::` is unavailable — write the full form
 (`:com.company.static-assets/files`). The Clojure side still reads it as
 `::static-assets/files`.
+
+`::alias/key` is shorthand, not a different key. With
+`[com.company.auth :as-alias auth]` and `[com.company.permission :as permission]`
+the structured permissions above read as:
+
+```clojure
+{:com.company.auth/permissions
+ [{:com.company.permission/resource :resource/products
+   :com.company.permission/action   :com.company.permission/update}]}
+```
+
+This is also how they are written in EDN, printed in Portal, and found by grep.
 
 ### 3.3 Vocabulary keys — short namespace, documented once
 
@@ -318,15 +337,24 @@ The key written in the config is the key of its `defmethod`. Grep a key from
 
 - MUST NOT `derive` Integrant keys, use composite keys (`[:a/x :b/y]`, which
   `derive` under the hood), or `#ig/ref`/`#ig/refset` a parent key (§8.5).
-- **Component keys** — fully qualified to the namespace holding the
+- **Component keys** — MUST be fully qualified to the namespace holding the
   `defmethod`s, for components a system has once:
   `:com.company.kafka/producer`, `:com.company.redis/client`,
-  `:com.company.tools.db-scheduler/db-store`.
+  `:com.company.tools.db-scheduler/db-store`. The key names the namespace
+  that registers its methods, so `ig/load-namespaces` (§5.4) requires it
+  whenever the key is in the config: for `:com.company.kafka/producer` it
+  loads `com.company.kafka` (and `com.company.kafka.producer` if it exists).
+  Adding a component to the config is enough to load its code; no `require`
+  in `system.clj` can be forgotten. A key qualified to anything else
+  (`:kafka/producer`, `:system/kafka`) only works while some other namespace
+  happens to require the implementation.
 - **Service instance keys** — `:service/<name>` and `:service.<name>/<thing>`,
   for components that exist per service or more than once:
   `:service/dashboard`, `:service.dashboard/http-server`, `:service.dashboard/db`.
   Each has its own `defmethod` in the service's `system.clj`: one line that
-  calls the shared plain function.
+  calls the shared plain function. `ig/load-namespaces` cannot find these
+  methods from the key; `main.clj` and `go` require the service's `system`
+  namespace instead (§1.2, §5.6).
 
 ```clojure
 (defmethod ig/init-key :service.dashboard/db [_ config]
@@ -572,6 +600,8 @@ secrets; `.env.local` is gitignored.
   `(defmethod ig/init-key :service/dashboard [_ config] config)`.
 - `com.company.tools.integrant/init-system!` wraps `ig/init` and halts the
   partially started system when a component throws.
+- `run-system!` calls `ig/load-namespaces` on the config before `ig/expand`
+  and `ig/init`, so every component namespace is loaded from its key (§3.4).
 - `run-system!` logs the resolved config (secrets print masked) before init.
 
 ### 5.5 Handler receives the system
@@ -604,7 +634,8 @@ raw keys; `com.company.request` exposes accessors:
   `(reset)`, `(halt)` via `integrant.repl`, starting the services listed under
   `:go-services` in `dev/dev_opts.edn`, and the Portal helpers of §11.1.
 - A `system-namespaces` map in `user.clj` maps each service root key to its
-  `system` namespace; `go` requires them before init.
+  `system` namespace; `go` requires them, then calls `ig/load-namespaces` for
+  the component namespaces, before init.
 - `dev/dev_opts.edn` (gitignored) holds personal preferences; a committed
   `dev_opts.edn.example` documents every option. A `#dev-opt` Aero reader,
   registered only in `user.clj`, lets dev config read it.
@@ -1065,7 +1096,7 @@ Typical set:
 ### 9.3 App-specific shared code
 
 Shared code that knows the domain lives in `com.company.<concern>`:
-`request`, `auth`, `permissions`, `mailer`, `feature-flags`, `i18n`,
+`request`, `auth`, `permission`, `mailer`, `feature-flags`, `i18n`,
 `error-pages`, `views.alert`. Generic collection helpers that are not in
 `clojure.core` come from `medley` first; anything left goes in `tools.coll`.
 
